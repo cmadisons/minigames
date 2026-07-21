@@ -168,7 +168,7 @@
 
   <div class="feedback" id="feedback">Enter a guess to begin!</div>
 
-  <div class="stats">Guesses: <span id="guess-count">0</span> · It's between <span id="range">1 and 100</span></div>
+  <div class="stats">Guesses: <span id="guess-count">0</span> · It's between <span id="range">1 and 100</span> · 🏆 Best: <span id="best">–</span></div>
 
   <div class="history" id="history"></div>
 
@@ -196,6 +196,12 @@
     const historyEl = document.getElementById("history");
     const saveBtn = document.getElementById("save-btn");
     const rangeEl = document.getElementById("range");
+    const bestEl = document.getElementById("best");
+
+    // High score = the fewest guesses you've ever needed to win (lower is better).
+    const BEST_KEY = "guess-the-number-best";
+    function loadBest() { const v = Number(localStorage.getItem(BEST_KEY)); return v > 0 ? v : null; }
+    function showBest() { const b = loadBest(); bestEl.textContent = b ? b : "–"; }
 
     function updateRange() {
       rangeEl.textContent = low + " and " + high;
@@ -284,7 +290,14 @@
 
       if (value === secret) {
         const word = guessCount === 1 ? "guess" : "guesses";
-        feedbackEl.textContent = "🎉 Correct! You got it in " + guessCount + " " + word + "!";
+        const prevBest = loadBest();
+        if (!prevBest || guessCount < prevBest) {
+          localStorage.setItem(BEST_KEY, guessCount);
+          showBest();
+          feedbackEl.textContent = "🎉 Correct in " + guessCount + " " + word + " — 🏆 new best!";
+        } else {
+          feedbackEl.textContent = "🎉 Correct! You got it in " + guessCount + " " + word + "!";
+        }
         feedbackEl.className = "feedback correct";
         addChip(value, "correct");
         gameOver = true;
@@ -376,6 +389,7 @@
     document.getElementById("reset").addEventListener("click", newGame);
 
     newGame();
+    showBest();
     renderSaves();
   </script>
 </body>

@@ -159,6 +159,10 @@
     </div>
   </div>
 
+  <div class="subtitle" style="margin-top:-12px;margin-bottom:20px;">
+    Win streak: <strong id="streak">0</strong> · 🏆 Best streak: <strong id="best-streak">0</strong>
+  </div>
+
   <div class="arena">
     <div class="hand" id="player-hand">❓</div>
     <span class="vs">VS</span>
@@ -187,13 +191,26 @@
     let round = 1;
     let matchOver = false;
 
+    // High score = your longest run of matches won in a row (kept across matches).
+    const BEST_STREAK_KEY = "rps-best-streak";
+    let streak = 0;
+    let bestStreak = Number(localStorage.getItem(BEST_STREAK_KEY)) || 0;
+
     const playerHandEl = document.getElementById("player-hand");
     const computerHandEl = document.getElementById("computer-hand");
     const resultEl = document.getElementById("result");
     const playerScoreEl = document.getElementById("player-score");
     const computerScoreEl = document.getElementById("computer-score");
     const roundNumEl = document.getElementById("round-num");
+    const streakEl = document.getElementById("streak");
+    const bestStreakEl = document.getElementById("best-streak");
     const choiceBtns = document.querySelectorAll(".choice-btn");
+
+    function updateStreakUI() {
+      streakEl.textContent = streak;
+      bestStreakEl.textContent = bestStreak;
+    }
+    updateStreakUI();
 
     function play(playerChoice) {
       if (matchOver) return;
@@ -236,8 +253,20 @@
 
       // Check for match winner
       if (playerScore === WINS_NEEDED) {
-        endMatch("🏆 You won the match " + playerScore + "–" + computerScore + "!", "win");
+        streak++;
+        let extra = "";
+        if (streak > bestStreak) {
+          bestStreak = streak;
+          localStorage.setItem(BEST_STREAK_KEY, bestStreak);
+          extra = " 🏆 New best streak!";
+        } else if (streak > 1) {
+          extra = " (" + streak + " in a row!)";
+        }
+        updateStreakUI();
+        endMatch("🏆 You won the match " + playerScore + "–" + computerScore + "!" + extra, "win");
       } else if (computerScore === WINS_NEEDED) {
+        streak = 0;
+        updateStreakUI();
         endMatch("💻 Computer won the match " + computerScore + "–" + playerScore + "!", "lose");
       } else {
         resultEl.textContent = outcome;

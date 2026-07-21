@@ -156,6 +156,8 @@
 
   <div class="status" id="status"></div>
 
+  <div class="status" id="record" style="min-height:1rem;font-size:0.9rem;color:#9b59ff;margin-top:-8px;"></div>
+
   <div class="board" id="board"></div>
 
   <button class="reset-btn" id="reset">Restart This Mode</button>
@@ -206,6 +208,16 @@
     const statusEl = document.getElementById("status");
     const modesEl = document.getElementById("modes");
     const scoreboardEl = document.getElementById("scoreboard");
+    const recordEl = document.getElementById("record");
+
+    // High score = your longest streak of games beating the computer (any difficulty).
+    const STREAK_KEY = "memory-cpu-streak";
+    const BEST_STREAK_KEY = "memory-cpu-streak-best";
+    let winStreak = Number(localStorage.getItem(STREAK_KEY)) || 0;
+    let bestStreak = Number(localStorage.getItem(BEST_STREAK_KEY)) || 0;
+    function showRecord() {
+      recordEl.textContent = "🏆 Beat-the-computer streak: " + winStreak + " · Best: " + bestStreak;
+    }
 
     // --- mode buttons ---
     function buildModeButtons() {
@@ -318,6 +330,25 @@
       }
       statusEl.textContent = msg;
       [...scoreboardEl.children].forEach(b => b.classList.remove("active"));
+
+      // Update the beat-the-computer streak (only in modes with a computer).
+      const you = players.find(p => p.type === "human");
+      const cpuMode = players.some(p => p.type === "cpu");
+      if (cpuMode && you) {
+        const youWon = winners.length === 1 && winners[0] === you;
+        if (youWon) {
+          winStreak++;
+          if (winStreak > bestStreak) {
+            bestStreak = winStreak;
+            localStorage.setItem(BEST_STREAK_KEY, bestStreak);
+            statusEl.textContent = msg + " 🏆 New best streak: " + bestStreak + "!";
+          }
+        } else {
+          winStreak = 0;   // a loss or tie breaks the streak
+        }
+        localStorage.setItem(STREAK_KEY, winStreak);
+        showRecord();
+      }
     }
 
     function nextPlayer() { current = (current + 1) % players.length; }
@@ -452,6 +483,7 @@
     document.getElementById("reset").addEventListener("click", () => startGame(modeKey));
 
     buildModeButtons();
+    showRecord();
     startGame("hard"); // default to the original difficulty
   </script>
 </body>
