@@ -55,9 +55,33 @@
     .name { font-size: 1.2rem; font-weight: 600; }
     .desc { font-size: 0.85rem; color: var(--muted); }
     footer { margin-top: 40px; color: var(--muted); font-size: 0.8rem; }
+
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 52px;
+      display: flex; align-items: center; gap: 12px; padding: 0 12px;
+      background: rgba(22,33,62,0.95); backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 1000;
+    }
+    .topbar .tabs { display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .topbar .tabs a {
+      text-decoration: none; color: #b9b9c9; font-size: 0.9rem; white-space: nowrap;
+      padding: 7px 12px; border-radius: 8px;
+    }
+    .topbar .tabs a:hover { background: rgba(255,255,255,0.06); color: #fff; }
+    .topbar .tabs a.active { background: #e94560; color: #fff; font-weight: 600; }
+    body { padding-top: 68px; }
   </style>
 </head>
 <body>
+  <nav class="topbar">
+    <div class="tabs">
+      <a href="index.html" class="active">🏠 Home</a>
+      <a href="rock-paper-scissors.html">✊ RPS</a>
+      <a href="1-100.html">🔢 1–100</a>
+      <a href="hedgehog.html">🦔 Whack</a>
+      <a href="memory.html">🧠 Memory</a>
+    </div>
+  </nav>
   <h1>🎮 Minigames</h1>
   <p class="subtitle">Pick a game to play</p>
 

@@ -127,6 +127,37 @@
   </style>
 </head>
 <body>
+  <style>
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 52px;
+      display: flex; align-items: center; gap: 12px; padding: 0 12px;
+      background: rgba(22,33,62,0.95); backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 1000;
+    }
+    .topbar .back {
+      text-decoration: none; color: #eaeaea; font-size: 1.2rem; line-height: 1;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 7px 13px; flex-shrink: 0;
+    }
+    .topbar .back:hover { border-color: #e94560; }
+    .topbar .tabs { display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .topbar .tabs a {
+      text-decoration: none; color: #b9b9c9; font-size: 0.9rem; white-space: nowrap;
+      padding: 7px 12px; border-radius: 8px;
+    }
+    .topbar .tabs a:hover { background: rgba(255,255,255,0.06); color: #fff; }
+    .topbar .tabs a.active { background: #e94560; color: #fff; font-weight: 600; }
+    body { padding-top: 68px; }
+  </style>
+  <nav class="topbar">
+    <a class="back" href="index.html" title="Back to menu">←</a>
+    <div class="tabs">
+      <a href="rock-paper-scissors.html">✊ RPS</a>
+      <a href="1-100.html" class="active">🔢 1–100</a>
+      <a href="hedgehog.html">🦔 Whack</a>
+      <a href="memory.html">🧠 Memory</a>
+    </div>
+  </nav>
   <h1>Guess the Number</h1>
   <p class="subtitle">The computer picked a number from <strong>1 to 100</strong>. Can you find it?</p>
 
