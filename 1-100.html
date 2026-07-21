@@ -31,7 +31,15 @@
     }
 
     h1 { margin-bottom: 8px; font-size: 2rem; }
-    .subtitle { color: #888; margin-bottom: 24px; }
+    .subtitle { color: #888; margin-bottom: 20px; }
+
+    .modes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 22px; }
+    .mode-btn {
+      font-size: 0.85rem; padding: 7px 14px; border: 1px solid #555;
+      border-radius: 8px; background: var(--card); color: var(--text); cursor: pointer;
+    }
+    .mode-btn:hover { border-color: var(--accent); }
+    .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
     .input-row { display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; }
 
@@ -159,7 +167,9 @@
     </div>
   </nav>
   <h1>Guess the Number</h1>
-  <p class="subtitle">The computer picked a number from <strong>1 to 100</strong>. Can you find it?</p>
+  <p class="subtitle">The computer picked a number from <strong id="range-desc">1 to 100</strong>. Can you find it?</p>
+
+  <div class="modes" id="modes"></div>
 
   <div class="input-row">
     <input type="number" id="guess-input" min="1" max="100" placeholder="1–100" autofocus>
@@ -185,7 +195,17 @@
   </div>
 
   <script>
-    const MIN = 1, MAX = 100;
+    const MIN = 1;
+
+    // Difficulty modes — each has its own number range AND its own high score.
+    const RANGES = {
+      easy:   { label: "Easy 1–50",    max: 50 },
+      medium: { label: "Medium 1–100", max: 100 },
+      hard:   { label: "Hard 1–500",   max: 500 },
+    };
+    const RANGE_ORDER = ["easy", "medium", "hard"];
+    let modeKey = "medium";
+    let MAX = RANGES[modeKey].max;
 
     let secret, guessCount, gameOver, guesses, low, high;
 
@@ -198,10 +218,34 @@
     const rangeEl = document.getElementById("range");
     const bestEl = document.getElementById("best");
 
-    // High score = the fewest guesses you've ever needed to win (lower is better).
-    const BEST_KEY = "guess-the-number-best";
-    function loadBest() { const v = Number(localStorage.getItem(BEST_KEY)); return v > 0 ? v : null; }
+    // High score = the fewest guesses to win — tracked SEPARATELY per difficulty.
+    const BEST_PREFIX = "guess-the-number-best-";   // + modeKey
+    function loadBest() { const v = Number(localStorage.getItem(BEST_PREFIX + modeKey)); return v > 0 ? v : null; }
     function showBest() { const b = loadBest(); bestEl.textContent = b ? b : "–"; }
+
+    // Mode buttons: pick a difficulty, which sets the range and its own high score.
+    const modesEl = document.getElementById("modes");
+    const rangeDescEl = document.getElementById("range-desc");
+    function buildModeButtons() {
+      modesEl.innerHTML = "";
+      RANGE_ORDER.forEach(key => {
+        const b = document.createElement("button");
+        b.className = "mode-btn" + (key === modeKey ? " active" : "");
+        b.textContent = RANGES[key].label;
+        b.addEventListener("click", () => setMode(key));
+        modesEl.appendChild(b);
+      });
+    }
+    function setMode(key) {
+      modeKey = key;
+      MAX = RANGES[key].max;
+      inputEl.max = MAX;
+      inputEl.placeholder = MIN + "–" + MAX;
+      rangeDescEl.textContent = MIN + " to " + MAX;
+      buildModeButtons();
+      showBest();
+      newGame();
+    }
 
     function updateRange() {
       rangeEl.textContent = low + " and " + high;
@@ -292,7 +336,7 @@
         const word = guessCount === 1 ? "guess" : "guesses";
         const prevBest = loadBest();
         if (!prevBest || guessCount < prevBest) {
-          localStorage.setItem(BEST_KEY, guessCount);
+          localStorage.setItem(BEST_PREFIX + modeKey, guessCount);
           showBest();
           feedbackEl.textContent = "🎉 Correct in " + guessCount + " " + word + " — 🏆 new best!";
         } else {
@@ -388,8 +432,7 @@
     saveBtn.addEventListener("click", saveGame);
     document.getElementById("reset").addEventListener("click", newGame);
 
-    newGame();
-    showBest();
+    setMode(modeKey);   // builds mode buttons, sets range + best, starts a game
     renderSaves();
   </script>
 </body>

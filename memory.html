@@ -210,13 +210,20 @@
     const scoreboardEl = document.getElementById("scoreboard");
     const recordEl = document.getElementById("record");
 
-    // High score = your longest streak of games beating the computer (any difficulty).
-    const STREAK_KEY = "memory-cpu-streak";
-    const BEST_STREAK_KEY = "memory-cpu-streak-best";
-    let winStreak = Number(localStorage.getItem(STREAK_KEY)) || 0;
-    let bestStreak = Number(localStorage.getItem(BEST_STREAK_KEY)) || 0;
+    // High score = your longest streak of games beating the computer.
+    // Tracked SEPARATELY for each difficulty (easy / mid / hard / perfect).
+    const STREAK_PREFIX = "memory-cpu-streak-";        // + modeKey → current run
+    const BEST_PREFIX = "memory-cpu-streak-best-";     // + modeKey → high score
+    function isCpuModeKey(key) {
+      return !!(MODES[key] && MODES[key].players.some(p => p.type === "cpu"));
+    }
+    function loadStreak(key) { return Number(localStorage.getItem(STREAK_PREFIX + key)) || 0; }
+    function loadBest(key)   { return Number(localStorage.getItem(BEST_PREFIX + key)) || 0; }
     function showRecord() {
-      recordEl.textContent = "🏆 Beat-the-computer streak: " + winStreak + " · Best: " + bestStreak;
+      if (!isCpuModeKey(modeKey)) { recordEl.textContent = ""; return; }
+      recordEl.textContent =
+        "🏆 " + MODES[modeKey].label + " streak: " + loadStreak(modeKey) +
+        " · Best: " + loadBest(modeKey);
     }
 
     // --- mode buttons ---
@@ -331,22 +338,21 @@
       statusEl.textContent = msg;
       [...scoreboardEl.children].forEach(b => b.classList.remove("active"));
 
-      // Update the beat-the-computer streak (only in modes with a computer).
+      // Update the beat-the-computer streak for THIS mode (modes with a computer only).
       const you = players.find(p => p.type === "human");
-      const cpuMode = players.some(p => p.type === "cpu");
-      if (cpuMode && you) {
+      if (isCpuModeKey(modeKey) && you) {
         const youWon = winners.length === 1 && winners[0] === you;
+        let streak = loadStreak(modeKey);
         if (youWon) {
-          winStreak++;
-          if (winStreak > bestStreak) {
-            bestStreak = winStreak;
-            localStorage.setItem(BEST_STREAK_KEY, bestStreak);
-            statusEl.textContent = msg + " 🏆 New best streak: " + bestStreak + "!";
+          streak++;
+          if (streak > loadBest(modeKey)) {
+            localStorage.setItem(BEST_PREFIX + modeKey, streak);
+            statusEl.textContent = msg + " 🏆 New " + MODES[modeKey].label + " best: " + streak + "!";
           }
         } else {
-          winStreak = 0;   // a loss or tie breaks the streak
+          streak = 0;   // a loss or tie breaks the streak
         }
-        localStorage.setItem(STREAK_KEY, winStreak);
+        localStorage.setItem(STREAK_PREFIX + modeKey, streak);
         showRecord();
       }
     }
@@ -475,6 +481,7 @@
       busy = false;
       current = 0;
       updateUI();
+      showRecord();   // reflect this mode's own high score
       // if (somehow) the first player is a computer, let it start
       if (players[current].type === "cpu") computerTurn();
     }

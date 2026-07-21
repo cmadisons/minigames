@@ -50,6 +50,14 @@
     #score-value { color: var(--points); }
     #best-value { color: #9b59ff; }
 
+    .modes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 12px; }
+    .mode-btn {
+      font-size: 0.85rem; padding: 7px 14px; border: 1px solid #555;
+      border-radius: 8px; background: #16213e; color: var(--text); cursor: pointer;
+    }
+    .mode-btn:hover { border-color: var(--accent); }
+    .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
     .misses { display: flex; gap: 6px; align-items: center; }
     .miss-dot {
       width: 16px; height: 16px; border-radius: 50%;
@@ -214,6 +222,8 @@
   </nav>
   <h1>🔨 Whack-a-Hedgehog 🦔🐉</h1>
 
+  <div class="modes" id="modes"></div>
+
   <div class="stats">
     <div class="stat">
       <div class="label">Time</div>
@@ -269,7 +279,15 @@
   <script>
     const SIZE = 5;
     const HOLES = SIZE * SIZE;       // 25
-    const START_TIME = 60;           // starting seconds (1:00)
+    // Difficulty modes — each sets the starting time AND keeps its own high score.
+    const MODES = {
+      easy:   { label: "Easy 90s",   time: 90 },
+      normal: { label: "Normal 60s", time: 60 },
+      hard:   { label: "Hard 30s",   time: 30 },
+    };
+    const MODE_ORDER = ["easy", "normal", "hard"];
+    let modeKey = "normal";
+    let START_TIME = MODES[modeKey].time;   // starting seconds
     const HEDGEHOG_MS = 3000;        // a hedgehog stays up 3 seconds
     const DRAGON_MS = 5000;          // a dragon stays up 5 seconds
     const SPAWN_MS = 850;            // how often a hedgehog tries to pop up
@@ -284,7 +302,7 @@
     const BOMB_SPAWN_MS = 3000;      // base gap between bombs (divided by speed)
     const BOMB_POINTS_PENALTY = 10;  // hit a bomb → choose: lose 10 points…
     const BOMB_TIME_PENALTY = 10;    //                  …or lose 10 seconds
-    const HS_KEY = "hedgehog-highscore";
+    const HS_PREFIX = "hedgehog-highscore-";   // + modeKey → per-difficulty high score
     // Sonic: rare moving bonus — hit it to GAIN 5 points or 5 seconds.
     const SONIC_MS = 5000;           // stays up 5 seconds
     const SONIC_MOVE_MS = 1000;      // moves 1 square every second
@@ -329,7 +347,7 @@
     const choosePointsBtn = document.getElementById("choose-points");
     const chooseSecondsBtn = document.getElementById("choose-seconds");
 
-    function loadHigh() { return Number(localStorage.getItem(HS_KEY)) || 0; }
+    function loadHigh() { return Number(localStorage.getItem(HS_PREFIX + modeKey)) || 0; }
 
     // --- build board ---
     function buildBoard() {
@@ -692,7 +710,7 @@
       updateStats();
       const best = loadHigh();
       if (score > best) {
-        localStorage.setItem(HS_KEY, score);
+        localStorage.setItem(HS_PREFIX + modeKey, score);
         bestEl.textContent = score;
         statusEl.textContent = "⏰ Time's up! 🏆 New high score: " + score + " points!";
       } else {
@@ -711,13 +729,36 @@
       setTimeout(() => hammerEl.classList.remove("whack"), 110);
     });
 
+    // --- difficulty mode buttons ---
+    const modesEl = document.getElementById("modes");
+    function buildModeButtons() {
+      modesEl.innerHTML = "";
+      MODE_ORDER.forEach(key => {
+        const b = document.createElement("button");
+        b.className = "mode-btn" + (key === modeKey ? " active" : "");
+        b.textContent = MODES[key].label;
+        b.addEventListener("click", () => setMode(key));
+        modesEl.appendChild(b);
+      });
+    }
+    function setMode(key) {
+      if (running) return;   // finish the current game before switching
+      modeKey = key;
+      START_TIME = MODES[key].time;
+      buildModeButtons();
+      bestEl.textContent = loadHigh();          // this mode's own high score
+      timeEl.textContent = formatTime(START_TIME);
+    }
+
     boardEl.addEventListener("click", onBoardClick);
     startBtn.addEventListener("click", startGame);
     choosePointsBtn.addEventListener("click", () => answerChoice("points"));
     chooseSecondsBtn.addEventListener("click", () => answerChoice("seconds"));
 
     buildBoard();
+    buildModeButtons();
     bestEl.textContent = loadHigh();
+    timeEl.textContent = formatTime(START_TIME);
   </script>
 </body>
 </html>
