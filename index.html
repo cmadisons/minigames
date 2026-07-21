@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minigames</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --card: #16213e;
+      --accent: #e94560;
+      --text: #eaeaea;
+      --muted: #888;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    h1 { font-size: 2.6rem; margin-bottom: 6px; }
+    .subtitle { color: var(--muted); margin-bottom: 36px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      width: 100%;
+      max-width: 760px;
+    }
+    a.game {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 28px 20px;
+      text-decoration: none;
+      color: var(--text);
+      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    a.game:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    .icon { font-size: 3rem; }
+    .name { font-size: 1.2rem; font-weight: 600; }
+    .desc { font-size: 0.85rem; color: var(--muted); }
+    footer { margin-top: 40px; color: var(--muted); font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <h1>🎮 Minigames</h1>
+  <p class="subtitle">Pick a game to play</p>
+
+  <div class="grid">
+    <a class="game" href="rock-paper-scissors.html">
+      <span class="icon">✊</span>
+      <span class="name">Rock Paper Scissors</span>
+      <span class="desc">Beat the computer, best of luck</span>
+    </a>
+    <a class="game" href="1-100.html">
+      <span class="icon">🔢</span>
+      <span class="name">Guess 1–100</span>
+      <span class="desc">Find the secret number</span>
+    </a>
+    <a class="game" href="hedgehog.html">
+      <span class="icon">🦔</span>
+      <span class="name">Whack-a-Hedgehog</span>
+      <span class="desc">Tap them before they hide</span>
+    </a>
+    <a class="game" href="memory.html">
+      <span class="icon">🧠</span>
+      <span class="name">Memory Match</span>
+      <span class="desc">Flip and match the pairs</span>
+    </a>
+  </div>
+
+  <footer>Built with plain HTML, CSS &amp; JavaScript</footer>
+</body>
+</html>
