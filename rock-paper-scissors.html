@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rock Paper Scissors</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --card: #16213e;
+      --accent: #e94560;
+      --text: #eaeaea;
+      --win: #2ecc71;
+      --lose: #e74c3c;
+      --tie: #f1c40f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      text-align: center;
+    }
+
+    h1 { margin-bottom: 8px; font-size: 2rem; }
+    .subtitle { color: #888; margin-bottom: 24px; }
+
+    .scoreboard {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 24px;
+      font-size: 1.2rem;
+    }
+    .score-box { display: flex; flex-direction: column; }
+    .score-box .label { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+    .score-box .value { font-size: 2.2rem; font-weight: bold; }
+
+    .arena {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 16px;
+      min-height: 120px;
+    }
+    .hand {
+      font-size: 4rem;
+      width: 110px;
+      height: 110px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--card);
+      border-radius: 50%;
+    }
+    .vs { font-size: 1.4rem; color: #888; font-weight: bold; }
+
+    .result {
+      font-size: 1.4rem;
+      font-weight: bold;
+      margin-bottom: 24px;
+      min-height: 1.6rem;
+    }
+    .result.win { color: var(--win); }
+    .result.lose { color: var(--lose); }
+    .result.tie { color: var(--tie); }
+
+    .choices { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+    .choice-btn {
+      font-size: 2.5rem;
+      width: 90px;
+      height: 90px;
+      border: 3px solid transparent;
+      border-radius: 16px;
+      background: var(--card);
+      cursor: pointer;
+      transition: transform 0.1s, border-color 0.1s;
+    }
+    .choice-btn:hover { transform: translateY(-4px); border-color: var(--accent); }
+    .choice-btn:active { transform: translateY(0); }
+    .choice-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; border-color: transparent; }
+    .choice-btn.selected { border-color: var(--accent); background: #2a2a4a; }
+
+    @keyframes pop {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.25); }
+      100% { transform: scale(1); }
+    }
+    .hand.pop { animation: pop 0.25s ease; }
+
+    .reset-btn {
+      margin-top: 24px;
+      padding: 10px 24px;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: transparent;
+      border: 1px solid #555;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+  <h1>Rock Paper Scissors</h1>
+  <p class="subtitle">Best of 5 — first to 3 wins takes the match!</p>
+
+  <div class="scoreboard">
+    <div class="score-box">
+      <span class="label">You</span>
+      <span class="value" id="player-score">0</span>
+    </div>
+    <div class="score-box">
+      <span class="label">Round</span>
+      <span class="value" id="round-num">1</span>
+    </div>
+    <div class="score-box">
+      <span class="label">Computer</span>
+      <span class="value" id="computer-score">0</span>
+    </div>
+  </div>
+
+  <div class="arena">
+    <div class="hand" id="player-hand">❓</div>
+    <span class="vs">VS</span>
+    <div class="hand" id="computer-hand">❓</div>
+  </div>
+
+  <div class="result" id="result">Make your move!</div>
+
+  <div class="choices">
+    <button class="choice-btn" data-choice="rock" title="Rock">✊</button>
+    <button class="choice-btn" data-choice="paper" title="Paper">✋</button>
+    <button class="choice-btn" data-choice="scissors" title="Scissors">✌️</button>
+  </div>
+
+  <button class="reset-btn" id="reset">New Match</button>
+
+  <script>
+    const EMOJI = { rock: "✊", paper: "✋", scissors: "✌️" };
+    // What each choice beats
+    const BEATS = { rock: "scissors", paper: "rock", scissors: "paper" };
+    const CHOICES = ["rock", "paper", "scissors"];
+    const WINS_NEEDED = 3; // first to 3 wins the best-of-5 match
+
+    let playerScore = 0;
+    let computerScore = 0;
+    let round = 1;
+    let matchOver = false;
+
+    const playerHandEl = document.getElementById("player-hand");
+    const computerHandEl = document.getElementById("computer-hand");
+    const resultEl = document.getElementById("result");
+    const playerScoreEl = document.getElementById("player-score");
+    const computerScoreEl = document.getElementById("computer-score");
+    const roundNumEl = document.getElementById("round-num");
+    const choiceBtns = document.querySelectorAll(".choice-btn");
+
+    function play(playerChoice) {
+      if (matchOver) return;
+
+      const computerChoice = CHOICES[Math.floor(Math.random() * 3)];
+
+      playerHandEl.textContent = EMOJI[playerChoice];
+      computerHandEl.textContent = EMOJI[computerChoice];
+
+      // Visual feedback on every press: highlight the chosen button
+      // and re-trigger the "pop" animation on both hands.
+      choiceBtns.forEach(btn => {
+        btn.classList.toggle("selected", btn.dataset.choice === playerChoice);
+      });
+      [playerHandEl, computerHandEl].forEach(el => {
+        el.classList.remove("pop");
+        void el.offsetWidth; // force reflow so the animation restarts each click
+        el.classList.add("pop");
+      });
+
+      let outcome, cssClass;
+      if (playerChoice === computerChoice) {
+        outcome = "It's a tie — replay the round!";
+        cssClass = "tie";
+      } else if (BEATS[playerChoice] === computerChoice) {
+        outcome = "You win the round! 🎉";
+        cssClass = "win";
+        playerScore++;
+        round++;
+      } else {
+        outcome = "Computer wins the round! 🤖";
+        cssClass = "lose";
+        computerScore++;
+        round++;
+      }
+
+      playerScoreEl.textContent = playerScore;
+      computerScoreEl.textContent = computerScore;
+      roundNumEl.textContent = round;
+
+      // Check for match winner
+      if (playerScore === WINS_NEEDED) {
+        endMatch("🏆 You won the match " + playerScore + "–" + computerScore + "!", "win");
+      } else if (computerScore === WINS_NEEDED) {
+        endMatch("💻 Computer won the match " + computerScore + "–" + playerScore + "!", "lose");
+      } else {
+        resultEl.textContent = outcome;
+        resultEl.className = "result " + cssClass;
+      }
+    }
+
+    function endMatch(message, cssClass) {
+      matchOver = true;
+      roundNumEl.textContent = "—";
+      resultEl.textContent = message;
+      resultEl.className = "result " + cssClass;
+      choiceBtns.forEach(btn => btn.disabled = true);
+    }
+
+    function newMatch() {
+      playerScore = 0;
+      computerScore = 0;
+      round = 1;
+      matchOver = false;
+      playerScoreEl.textContent = "0";
+      computerScoreEl.textContent = "0";
+      roundNumEl.textContent = "1";
+      playerHandEl.textContent = "❓";
+      computerHandEl.textContent = "❓";
+      resultEl.textContent = "Make your move!";
+      resultEl.className = "result";
+      choiceBtns.forEach(btn => {
+        btn.disabled = false;
+        btn.classList.remove("selected");
+      });
+    }
+
+    choiceBtns.forEach(btn => {
+      btn.addEventListener("click", () => play(btn.dataset.choice));
+    });
+
+    document.getElementById("reset").addEventListener("click", newMatch);
+
+    // Keyboard support: r / p / s
+    document.addEventListener("keydown", e => {
+      const key = e.key.toLowerCase();
+      if (key === "r") play("rock");
+      else if (key === "p") play("paper");
+      else if (key === "s") play("scissors");
+    });
+  </script>
+</body>
+</html>

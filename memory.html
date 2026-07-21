@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Match</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --card: #16213e;
+      --card-back: #0f3460;
+      --accent: #e94560;
+      --text: #eaeaea;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 { margin: 4px 0 12px; font-size: 1.7rem; }
+
+    .modes {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 16px;
+      max-width: 560px;
+    }
+    .mode-btn {
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      border: 1px solid #555;
+      border-radius: 8px;
+      background: var(--card);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .mode-btn:hover { border-color: var(--accent); }
+    .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    .scoreboard {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .score-box {
+      padding: 8px 18px;
+      border-radius: 12px;
+      background: var(--card);
+      border: 2px solid transparent;
+      min-width: 110px;
+    }
+    .score-box.active { border-color: var(--pc, var(--accent)); box-shadow: 0 0 0 1px var(--pc, var(--accent)); }
+    .score-box .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: var(--pc, #999); font-weight: bold; }
+    .score-box .value { font-size: 1.7rem; font-weight: bold; }
+
+    .status { min-height: 1.6rem; font-size: 1.1rem; font-weight: bold; margin-bottom: 14px; }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+      max-width: 540px;
+      width: 100%;
+    }
+    .card {
+      aspect-ratio: 3 / 4;
+      perspective: 600px;
+      cursor: pointer;
+    }
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.4s;
+      transform-style: preserve-3d;
+    }
+    .card.flipped .card-inner { transform: rotateY(180deg); }
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      font-size: clamp(1.4rem, 6vw, 2.2rem);
+    }
+    .card-back { background: var(--card-back); border: 2px solid #1b4b80; }
+    .card-front { background: var(--card); border: 2px solid #2a2a4a; transform: rotateY(180deg); }
+    .card.matched { cursor: default; }
+    .card.matched .card-inner { opacity: 0; transition: opacity 0.4s 0.2s, transform 0.4s; }
+    .card.peek .card-front { border-color: var(--accent); }
+
+    .reset-btn {
+      margin-top: 22px;
+      padding: 10px 24px;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: transparent;
+      border: 1px solid #555;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+  <h1>🃏 Memory Match</h1>
+
+  <div class="modes" id="modes"></div>
+
+  <div class="scoreboard" id="scoreboard"></div>
+
+  <div class="status" id="status"></div>
+
+  <div class="board" id="board"></div>
+
+  <button class="reset-btn" id="reset">Restart This Mode</button>
+
+  <script>
+    const ROWS = 5, COLS = 6;          // 5 × 6 = 30 cards
+    const TOTAL = ROWS * COLS;          // 30
+    const PAIRS = TOTAL / 2;            // 15 unique symbols
+    // 15 MLB teams. Logo images load from ESPN's CDN; the colored badge
+    // (bg + abbr in fg) is the fallback if an image can't load.
+    const TEAMS = [
+      { id: "NYY", abbr: "NYY", espn: "nyy", bg: "#0C2340", fg: "#FFFFFF" }, // Yankees
+      { id: "BOS", abbr: "BOS", espn: "bos", bg: "#BD3039", fg: "#FFFFFF" }, // Red Sox
+      { id: "LAD", abbr: "LAD", espn: "lad", bg: "#005A9C", fg: "#FFFFFF" }, // Dodgers
+      { id: "SF",  abbr: "SF",  espn: "sf",  bg: "#27251F", fg: "#FD5A1E" }, // Giants
+      { id: "CHC", abbr: "CHC", espn: "chc", bg: "#0E3386", fg: "#CC3433" }, // Cubs
+      { id: "STL", abbr: "STL", espn: "stl", bg: "#C41E3A", fg: "#FEDB00" }, // Cardinals
+      { id: "HOU", abbr: "HOU", espn: "hou", bg: "#002D62", fg: "#EB6E1F" }, // Astros
+      { id: "NYM", abbr: "NYM", espn: "nym", bg: "#002D72", fg: "#FF5910" }, // Mets
+      { id: "ATL", abbr: "ATL", espn: "atl", bg: "#13274F", fg: "#CE1141" }, // Braves
+      { id: "PHI", abbr: "PHI", espn: "phi", bg: "#E81828", fg: "#FFFFFF" }, // Phillies
+      { id: "CHW", abbr: "CWS", espn: "chw", bg: "#27251F", fg: "#C4CED4" }, // White Sox
+      { id: "SD",  abbr: "SD",  espn: "sd",  bg: "#2F241D", fg: "#FFC425" }, // Padres
+      { id: "TOR", abbr: "TOR", espn: "tor", bg: "#134A8E", fg: "#FFFFFF" }, // Blue Jays
+      { id: "SEA", abbr: "SEA", espn: "sea", bg: "#0C2C56", fg: "#005C5C" }, // Mariners
+      { id: "TEX", abbr: "TEX", espn: "tex", bg: "#003278", fg: "#C0111F" }, // Rangers
+    ];
+    const LOGO_URL = espn => "images/" + espn + ".png"; // local files — works offline
+    const COLORS = ["#2ecc71", "#e94560", "#3498db", "#f1c40f"];
+
+    // skill = chance the computer memorizes a revealed card (1 = perfect recall)
+    const MODES = {
+      easy:    { label: "Easy 🤖",    players: [ {name: "You", type: "human"}, {name: "Computer", type: "cpu", skill: 0.25} ] },
+      mid:     { label: "Mid 🤖",     players: [ {name: "You", type: "human"}, {name: "Computer", type: "cpu", skill: 0.55} ] },
+      hard:    { label: "Hard 🤖",    players: [ {name: "You", type: "human"}, {name: "Computer", type: "cpu", skill: 0.78} ] },
+      perfect: { label: "Perfect 🤖", players: [ {name: "You", type: "human"}, {name: "Computer", type: "cpu", skill: 1.0} ] },
+      two:     { label: "2 Player",   players: [ {name: "Player 1", type: "human"}, {name: "Player 2", type: "human"} ] },
+      three:   { label: "3 Player",   players: [ {name: "Player 1", type: "human"}, {name: "Player 2", type: "human"}, {name: "Player 3", type: "human"} ] },
+    };
+    const MODE_ORDER = ["easy", "mid", "hard", "perfect", "two", "three"];
+
+    let deck, matched, firstIndex, busy;
+    let players;        // [{name, type, skill?, score, memory?, color}]
+    let current;        // index into players
+    let modeKey;
+
+    const boardEl = document.getElementById("board");
+    const statusEl = document.getElementById("status");
+    const modesEl = document.getElementById("modes");
+    const scoreboardEl = document.getElementById("scoreboard");
+
+    // --- mode buttons ---
+    function buildModeButtons() {
+      modesEl.innerHTML = "";
+      MODE_ORDER.forEach(key => {
+        const btn = document.createElement("button");
+        btn.className = "mode-btn";
+        btn.textContent = MODES[key].label;
+        btn.dataset.mode = key;
+        btn.addEventListener("click", () => startGame(key));
+        modesEl.appendChild(btn);
+      });
+    }
+    function highlightMode() {
+      [...modesEl.children].forEach(b =>
+        b.classList.toggle("active", b.dataset.mode === modeKey));
+    }
+
+    // --- helpers ---
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+    function buildDeck() {
+      const chosen = TEAMS.slice(0, PAIRS);
+      deck = shuffle(chosen.concat(chosen));
+    }
+    function buildBoard() {
+      boardEl.innerHTML = "";
+      for (let i = 0; i < TOTAL; i++) {
+        const t = deck[i];
+        const card = document.createElement("div");
+        card.className = "card";
+        card.dataset.index = i;
+        // Light background so the team logos stand out; fallback abbr uses
+        // the team's dark color so it stays readable.
+        const frontStyle =
+          "background:#f4f4f8;color:" + t.bg +
+          ";font-weight:800;letter-spacing:0.5px;" +
+          "font-size:clamp(0.8rem,3.6vw,1.3rem);";
+        // If the logo image fails to load, fall back to the team abbreviation.
+        const onErr =
+          "this.style.display='none';this.parentElement.textContent='" + t.abbr + "';";
+        const img =
+          '<img src="' + LOGO_URL(t.espn) + '" alt="' + t.abbr + '" ' +
+          'style="width:92%;height:92%;object-fit:contain;' +
+          'filter:saturate(1.15) contrast(1.05);" onerror="' + onErr + '">';
+        card.innerHTML =
+          '<div class="card-inner">' +
+            '<div class="card-face card-back">⚾</div>' +
+            '<div class="card-face card-front" style="' + frontStyle + '">' + img + '</div>' +
+          '</div>';
+        boardEl.appendChild(card);
+      }
+    }
+    function cardEl(i) { return boardEl.children[i]; }
+
+    function remember(i) {
+      // every computer "watches" each revealed card and memorizes it per its skill
+      for (const p of players) {
+        if (p.type === "cpu" && Math.random() < p.skill) p.memory[i] = deck[i].id;
+      }
+    }
+    function flipUp(i) { cardEl(i).classList.add("flipped"); remember(i); }
+    function flipDown(i) { cardEl(i).classList.remove("flipped"); }
+    function setMatched(i) {
+      matched[i] = true;
+      cardEl(i).classList.add("matched");
+      for (const p of players) { if (p.memory) delete p.memory[i]; }
+    }
+
+    // --- scoreboard ---
+    function buildScoreboard() {
+      scoreboardEl.innerHTML = "";
+      players.forEach((p, idx) => {
+        const box = document.createElement("div");
+        box.className = "score-box";
+        box.style.setProperty("--pc", p.color);
+        box.innerHTML =
+          '<div class="label">' + p.name + '</div>' +
+          '<div class="value" id="score-' + idx + '">0</div>';
+        scoreboardEl.appendChild(box);
+      });
+    }
+    function updateUI() {
+      players.forEach((p, idx) => {
+        document.getElementById("score-" + idx).textContent = p.score;
+        scoreboardEl.children[idx].classList.toggle("active", idx === current);
+      });
+      if (isGameOver()) return;
+      const p = players[current];
+      statusEl.textContent = p.type === "cpu"
+        ? p.name + " is thinking…"
+        : p.name + "'s turn — flip two cards!";
+    }
+
+    function isGameOver() { return matched.every(Boolean); }
+
+    function endGame() {
+      const max = Math.max(...players.map(p => p.score));
+      const winners = players.filter(p => p.score === max);
+      let msg;
+      if (winners.length === 1) {
+        msg = "🎉 " + winners[0].name + " wins with " + max + " pairs!";
+      } else {
+        msg = "🤝 Tie between " + winners.map(p => p.name).join(" & ") + " (" + max + " each)!";
+      }
+      statusEl.textContent = msg;
+      [...scoreboardEl.children].forEach(b => b.classList.remove("active"));
+    }
+
+    function nextPlayer() { current = (current + 1) % players.length; }
+
+    // Resolve a flipped pair for the current player.
+    function resolvePair(a, b) {
+      const who = current;
+      const isMatch = deck[a].id === deck[b].id;
+      if (isMatch) {
+        setTimeout(() => {
+          setMatched(a);
+          setMatched(b);
+          players[who].score++;
+          updateUI();
+          if (isGameOver()) { endGame(); return; }
+          busy = false;
+          if (players[current].type === "cpu") computerTurn(); // same player goes again
+        }, 550);
+      } else {
+        setTimeout(() => {
+          flipDown(a);
+          flipDown(b);
+          nextPlayer();
+          busy = false;
+          updateUI();
+          if (players[current].type === "cpu") computerTurn();
+        }, 1000);
+      }
+    }
+
+    // --- human turn ---
+    function onCardClick(e) {
+      const cardDiv = e.target.closest(".card");
+      if (!cardDiv) return;
+      const i = Number(cardDiv.dataset.index);
+      if (busy || players[current].type !== "human") return;
+      if (matched[i] || cardDiv.classList.contains("flipped")) return;
+
+      flipUp(i);
+      if (firstIndex === null) { firstIndex = i; return; }
+      const a = firstIndex;
+      firstIndex = null;
+      busy = true;
+      resolvePair(a, i);
+    }
+
+    // --- computer turn ---
+    function hiddenIndices() {
+      const list = [];
+      for (let i = 0; i < TOTAL; i++) if (!matched[i]) list.push(i);
+      return list;
+    }
+    function knownSymbolMap(memory) {
+      const map = {};
+      for (const key in memory) {
+        const i = Number(key);
+        if (matched[i]) continue;
+        (map[memory[key]] = map[memory[key]] || []).push(i);
+      }
+      return map;
+    }
+    function decideCpuPicks(player) {
+      const hidden = hiddenIndices();
+      const map = knownSymbolMap(player.memory);
+
+      // 1. already remembers a full pair?
+      for (const sym in map) {
+        if (map[sym].length >= 2) return [map[sym][0], map[sym][1]];
+      }
+      // 2. flip a random unknown card first
+      const unknown = hidden.filter(i => !(i in player.memory));
+      const pool = unknown.length ? unknown : hidden;
+      const first = pool[Math.floor(Math.random() * pool.length)];
+
+      // does memory know a partner for what it just saw?
+      const known = map[deck[first].id];
+      if (known) {
+        const partner = known.find(i => i !== first && !matched[i]);
+        if (partner !== undefined) return [first, partner];
+      }
+      // 3. otherwise flip another random unknown card
+      const rest = pool.filter(i => i !== first);
+      const secondPool = rest.length ? rest : hidden.filter(i => i !== first);
+      const second = secondPool[Math.floor(Math.random() * secondPool.length)];
+      return [first, second];
+    }
+    function computerTurn() {
+      if (isGameOver()) return;
+      busy = true;
+      updateUI();
+      const player = players[current];
+      setTimeout(() => {
+        const [a, b] = decideCpuPicks(player);
+        flipUp(a); cardEl(a).classList.add("peek");
+        setTimeout(() => {
+          flipUp(b); cardEl(b).classList.add("peek");
+          setTimeout(() => {
+            cardEl(a).classList.remove("peek");
+            cardEl(b).classList.remove("peek");
+            resolvePair(a, b);
+          }, 750);
+        }, 750);
+      }, 650);
+    }
+
+    // --- game setup ---
+    function startGame(key) {
+      modeKey = key;
+      highlightMode();
+      // fresh copy of the mode's players
+      players = MODES[key].players.map((p, idx) => ({
+        name: p.name,
+        type: p.type,
+        skill: p.skill,
+        score: 0,
+        color: COLORS[idx % COLORS.length],
+        memory: p.type === "cpu" ? {} : undefined,
+      }));
+      buildDeck();
+      buildBoard();
+      buildScoreboard();
+      matched = new Array(TOTAL).fill(false);
+      firstIndex = null;
+      busy = false;
+      current = 0;
+      updateUI();
+      // if (somehow) the first player is a computer, let it start
+      if (players[current].type === "cpu") computerTurn();
+    }
+
+    boardEl.addEventListener("click", onCardClick);
+    document.getElementById("reset").addEventListener("click", () => startGame(modeKey));
+
+    buildModeButtons();
+    startGame("hard"); // default to the original difficulty
+  </script>
+</body>
+</html>

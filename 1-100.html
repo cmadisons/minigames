@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guess 1–100</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --card: #16213e;
+      --accent: #e94560;
+      --text: #eaeaea;
+      --high: #f1c40f;
+      --low: #3498db;
+      --correct: #2ecc71;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      text-align: center;
+    }
+
+    h1 { margin-bottom: 8px; font-size: 2rem; }
+    .subtitle { color: #888; margin-bottom: 24px; }
+
+    .input-row { display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; }
+
+    #guess-input {
+      font-size: 1.4rem;
+      width: 120px;
+      padding: 10px;
+      text-align: center;
+      border: 2px solid #555;
+      border-radius: 10px;
+      background: var(--card);
+      color: var(--text);
+    }
+    #guess-input:focus { outline: none; border-color: var(--accent); }
+
+    .btn {
+      font-size: 1.1rem;
+      padding: 10px 22px;
+      border: none;
+      border-radius: 10px;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .feedback {
+      font-size: 1.6rem;
+      font-weight: bold;
+      min-height: 2rem;
+      margin-bottom: 16px;
+    }
+    .feedback.high { color: var(--high); }
+    .feedback.low { color: var(--low); }
+    .feedback.correct { color: var(--correct); }
+
+    .stats { color: #aaa; margin-bottom: 16px; }
+    .stats span { color: var(--text); font-weight: bold; }
+
+    .actions { margin-top: 16px; min-height: 44px; }
+    .save-btn { background: var(--correct); }
+
+    .history {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 360px;
+      min-height: 32px;
+    }
+    .chip {
+      padding: 4px 10px;
+      border-radius: 14px;
+      font-size: 0.85rem;
+      background: var(--card);
+      border: 1px solid #444;
+    }
+    .chip.high { border-color: var(--high); }
+    .chip.low { border-color: var(--low); }
+
+    .reset-btn {
+      margin-top: 24px;
+      padding: 10px 24px;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: transparent;
+      border: 1px solid #555;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .saved {
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid #333;
+      width: 100%;
+      max-width: 420px;
+    }
+    .saved h2 { font-size: 1.2rem; margin-bottom: 12px; }
+    .saved-item {
+      background: var(--card);
+      border: 1px solid #444;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    .saved-item .title { font-weight: bold; margin-bottom: 4px; }
+    .saved-item .detail { color: #aaa; font-size: 0.82rem; }
+  </style>
+</head>
+<body>
+  <h1>Guess the Number</h1>
+  <p class="subtitle">The computer picked a number from <strong>1 to 100</strong>. Can you find it?</p>
+
+  <div class="input-row">
+    <input type="number" id="guess-input" min="1" max="100" placeholder="1–100" autofocus>
+    <button class="btn" id="guess-btn">Guess</button>
+  </div>
+
+  <div class="feedback" id="feedback">Enter a guess to begin!</div>
+
+  <div class="stats">Guesses: <span id="guess-count">0</span> · It's between <span id="range">1 and 100</span></div>
+
+  <div class="history" id="history"></div>
+
+  <div class="actions">
+    <button class="btn save-btn" id="save-btn" style="display:none;">💾 Save Game</button>
+  </div>
+
+  <button class="reset-btn" id="reset">New Game</button>
+
+  <div class="saved" id="saved" style="display:none;">
+    <h2>📂 Saved Games</h2>
+    <div id="saved-list"></div>
+    <button class="reset-btn" id="clear-saved">Clear Saved Games</button>
+  </div>
+
+  <script>
+    const MIN = 1, MAX = 100;
+
+    let secret, guessCount, gameOver, guesses, low, high;
+
+    const inputEl = document.getElementById("guess-input");
+    const guessBtn = document.getElementById("guess-btn");
+    const feedbackEl = document.getElementById("feedback");
+    const guessCountEl = document.getElementById("guess-count");
+    const historyEl = document.getElementById("history");
+    const saveBtn = document.getElementById("save-btn");
+    const rangeEl = document.getElementById("range");
+
+    function updateRange() {
+      rangeEl.textContent = low + " and " + high;
+    }
+
+    function newGame() {
+      secret = Math.floor(Math.random() * (MAX - MIN + 1)) + MIN;
+      guessCount = 0;
+      gameOver = false;
+      guesses = [];
+      low = MIN;   // smallest the secret could still be
+      high = MAX;  // largest the secret could still be
+      updateRange();
+      feedbackEl.textContent = "Enter a guess to begin!";
+      feedbackEl.className = "feedback";
+      guessCountEl.textContent = "0";
+      historyEl.innerHTML = "";
+      saveBtn.style.display = "none";
+      saveBtn.disabled = false;
+      saveBtn.textContent = "💾 Save Game";
+      inputEl.value = "";
+      inputEl.disabled = false;
+      guessBtn.disabled = false;
+      inputEl.focus();
+    }
+
+    function addChip(value, type) {
+      const chip = document.createElement("span");
+      chip.className = "chip " + type;
+      chip.textContent = value + (type === "high" ? " ↓" : type === "low" ? " ↑" : " ✓");
+      historyEl.appendChild(chip);
+    }
+
+    function guess() {
+      if (gameOver) return;
+
+      const raw = inputEl.value.trim();
+      const value = Number(raw);
+
+      // Reject "e"/"E" (scientific notation) — number inputs sneak it through.
+      if (/[eE]/.test(raw)) {
+        feedbackEl.textContent = "No 'e' allowed!";
+        feedbackEl.className = "feedback";
+        inputEl.select();
+        return;
+      }
+      // Reject blanks and anything that isn't a number (e.g. letters).
+      if (raw === "" || isNaN(value)) {
+        feedbackEl.textContent = "Numbers only — letters aren't allowed!";
+        feedbackEl.className = "feedback";
+        inputEl.select();
+        return;
+      }
+      // Reject decimals (must be a whole number).
+      if (!Number.isInteger(value)) {
+        feedbackEl.textContent = "Whole numbers only — no decimals!";
+        feedbackEl.className = "feedback";
+        inputEl.select();
+        return;
+      }
+      if (value < MIN || value > MAX) {
+        feedbackEl.textContent = "Please enter a number from 1 to 100.";
+        feedbackEl.className = "feedback";
+        inputEl.select();
+        return;
+      }
+      // No guessing the same number twice.
+      if (guesses.includes(value)) {
+        feedbackEl.textContent = "You already guessed " + value + "!";
+        feedbackEl.className = "feedback";
+        inputEl.select();
+        return;
+      }
+      // Can't guess outside what you already know. e.g. once it's "lower"
+      // than 50, you can't guess 50 or higher.
+      if (value < low || value > high) {
+        feedbackEl.textContent = "You already know it's between " + low + " and " + high + "!";
+        feedbackEl.className = "feedback";
+        inputEl.select();
+        return;
+      }
+
+      guessCount++;
+      guessCountEl.textContent = guessCount;
+      guesses.push(value);
+
+      if (value === secret) {
+        const word = guessCount === 1 ? "guess" : "guesses";
+        feedbackEl.textContent = "🎉 Correct! You got it in " + guessCount + " " + word + "!";
+        feedbackEl.className = "feedback correct";
+        addChip(value, "correct");
+        gameOver = true;
+        inputEl.disabled = true;
+        guessBtn.disabled = true;
+        saveBtn.style.display = "inline-block";
+      } else if (value < secret) {
+        feedbackEl.textContent = "📈 Higher!";
+        feedbackEl.className = "feedback low";
+        addChip(value, "low");
+        low = value + 1;   // secret is above this guess
+        updateRange();
+      } else {
+        feedbackEl.textContent = "📉 Lower!";
+        feedbackEl.className = "feedback high";
+        addChip(value, "high");
+        high = value - 1;  // secret is below this guess
+        updateRange();
+      }
+
+      inputEl.value = "";
+      inputEl.focus();
+    }
+
+    const STORAGE_KEY = "guess-the-number-saves";
+    const savedEl = document.getElementById("saved");
+    const savedListEl = document.getElementById("saved-list");
+
+    function loadSaves() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function renderSaves() {
+      const saves = loadSaves();
+      if (saves.length === 0) {
+        savedEl.style.display = "none";
+        return;
+      }
+      savedEl.style.display = "block";
+      savedListEl.innerHTML = "";
+      // Newest first
+      saves.slice().reverse().forEach(s => {
+        const word = s.guessCount === 1 ? "guess" : "guesses";
+        const item = document.createElement("div");
+        item.className = "saved-item";
+        const title = document.createElement("div");
+        title.className = "title";
+        title.textContent = "Secret " + s.secret + " — solved in " + s.guessCount + " " + word;
+        const detail = document.createElement("div");
+        detail.className = "detail";
+        detail.textContent = s.date + " · guesses: " + s.guesses.join(", ");
+        item.appendChild(title);
+        item.appendChild(detail);
+        savedListEl.appendChild(item);
+      });
+    }
+
+    function saveGame() {
+      const saves = loadSaves();
+      saves.push({
+        secret: secret,
+        guessCount: guessCount,
+        guesses: guesses.slice(),
+        date: new Date().toLocaleString()
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saves));
+      renderSaves();
+      saveBtn.disabled = true;
+      saveBtn.textContent = "✅ Saved!";
+      feedbackEl.textContent = "💾 Game saved in your browser!";
+    }
+
+    document.getElementById("clear-saved").addEventListener("click", () => {
+      localStorage.removeItem(STORAGE_KEY);
+      renderSaves();
+    });
+
+    guessBtn.addEventListener("click", guess);
+    inputEl.addEventListener("keydown", e => {
+      if (e.key === "Enter") { guess(); return; }
+      // Number inputs allow "e" (scientific notation) and "+" — block them.
+      if (e.key === "e" || e.key === "E" || e.key === "+") e.preventDefault();
+    });
+    saveBtn.addEventListener("click", saveGame);
+    document.getElementById("reset").addEventListener("click", newGame);
+
+    newGame();
+    renderSaves();
+  </script>
+</body>
+</html>

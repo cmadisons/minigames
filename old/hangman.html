@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hangman</title>
+<style>
+  :root { --bg:#1e1e2e; --fg:#cdd6f4; --accent:#89b4fa; --bad:#f38ba8; --good:#a6e3a1; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--bg); color: var(--fg);
+  }
+  .game { width: min(560px, 92vw); padding: 2rem; text-align: center; }
+  h1 { margin: 0 0 .25rem; color: var(--accent); }
+  .word { font-size: 2.4rem; letter-spacing: .35rem; margin: 1.5rem 0; min-height: 2.6rem; }
+  .status { min-height: 1.4rem; margin: .5rem 0; }
+  .lives { color: var(--bad); font-size: 1.1rem; }
+  .keys { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; margin: 1.5rem 0; }
+  button.key {
+    width: 2.4rem; height: 2.4rem; border: 1px solid #45475a; border-radius: 6px;
+    background: #313244; color: var(--fg); font: inherit; font-size: 1rem; cursor: pointer;
+    text-transform: uppercase; transition: background .12s;
+  }
+  button.key:hover:not(:disabled) { background: #45475a; }
+  button.key:disabled { opacity: .35; cursor: default; }
+  button.key.good { background: var(--good); color: #11111b; border-color: var(--good); }
+  button.key.bad  { background: var(--bad);  color: #11111b; border-color: var(--bad); }
+  .outcome { font-size: 1.3rem; margin-top: 1rem; min-height: 1.6rem; font-weight: bold; }
+  .reset {
+    margin-top: 1rem; padding: .6rem 1.4rem; border: none; border-radius: 8px;
+    background: var(--accent); color: #11111b; font: inherit; font-weight: bold; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="game">
+  <h1>Hangman</h1>
+  <div class="status" id="intro"></div>
+  <div class="word" id="word"></div>
+  <div class="lives" id="lives"></div>
+  <div class="status" id="message"></div>
+  <div class="keys" id="keys"></div>
+  <div class="outcome" id="outcome"></div>
+  <button class="reset" id="reset" hidden>Play again</button>
+</div>
+
+<script>
+  // Mirrors hangman.py
+  const WORDS = [
+    "python", "boolean", "iterator", "variable", "function", "compiler",
+    "algorithm", "keyboard", "browser", "network", "database", "syntax",
+    "recursion", "boolean", "package", "library", "terminal", "operator",
+  ];
+  const MAX_LIVES = 5;
+
+  const els = {
+    intro:   document.getElementById("intro"),
+    word:    document.getElementById("word"),
+    lives:   document.getElementById("lives"),
+    message: document.getElementById("message"),
+    keys:    document.getElementById("keys"),
+    outcome: document.getElementById("outcome"),
+    reset:   document.getElementById("reset"),
+  };
+
+  let word, guessed, wrong, over;
+
+  const chooseWord = () => WORDS[Math.floor(Math.random() * WORDS.length)];
+  const maskWord = () => [...word].map(c => guessed.has(c) ? c : "_").join(" ");
+  const isWon = () => [...word].every(c => guessed.has(c));
+
+  function newGame() {
+    word = chooseWord();
+    guessed = new Set();
+    wrong = 0;
+    over = false;
+
+    els.intro.textContent = `The word has ${word.length} letters. You have ${MAX_LIVES} lives.`;
+    els.message.textContent = "";
+    els.outcome.textContent = "";
+    els.reset.hidden = true;
+    buildKeys();
+    render();
+  }
+
+  function buildKeys() {
+    els.keys.innerHTML = "";
+    for (const code of Array.from({ length: 26 }, (_, i) => 97 + i)) {
+      const letter = String.fromCharCode(code);
+      const btn = document.createElement("button");
+      btn.className = "key";
+      btn.textContent = letter;
+      btn.dataset.letter = letter;
+      btn.addEventListener("click", () => guess(letter));
+      els.keys.appendChild(btn);
+    }
+  }
+
+  function render() {
+    els.word.textContent = maskWord();
+    els.lives.textContent = `Lives left: ${MAX_LIVES - wrong}`;
+  }
+
+  function guess(letter) {
+    if (over || guessed.has(letter)) return;
+    guessed.add(letter);
+
+    const btn = els.keys.querySelector(`[data-letter="${letter}"]`);
+    btn.disabled = true;
+
+    if (word.includes(letter)) {
+      btn.classList.add("good");
+      els.message.textContent = `Good guess! '${letter}' is in the word.`;
+    } else {
+      btn.classList.add("bad");
+      wrong++;
+      els.message.textContent = `Sorry, '${letter}' is not in the word.`;
+    }
+
+    render();
+
+    if (isWon()) {
+      els.outcome.textContent = `You won! The word was '${word}'.`;
+      els.outcome.style.color = "var(--good)";
+      endGame();
+    } else if (wrong >= MAX_LIVES) {
+      els.outcome.textContent = `Out of lives! The word was '${word}'.`;
+      els.outcome.style.color = "var(--bad)";
+      els.word.textContent = [...word].join(" ");
+      endGame();
+    }
+  }
+
+  function endGame() {
+    over = true;
+    els.keys.querySelectorAll("button").forEach(b => b.disabled = true);
+    els.reset.hidden = false;
+  }
+
+  // Physical keyboard support
+  document.addEventListener("keydown", e => {
+    const k = e.key.toLowerCase();
+    if (k.length === 1 && k >= "a" && k <= "z") guess(k);
+  });
+
+  els.reset.addEventListener("click", newGame);
+  newGame();
+</script>
+</body>
+</html>

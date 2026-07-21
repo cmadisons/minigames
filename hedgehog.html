@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Whack-a-Hedgehog</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --hole: #3d2b1f;
+      --hole-rim: #5a4030;
+      --grass: #2e7d32;
+      --text: #eaeaea;
+      --accent: #e94560;
+      --bonus: #2ecc71;
+      --points: #f1c40f;
+      --penalty: #e74c3c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 { margin: 4px 0 12px; font-size: 1.6rem; }
+
+    .stats {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .stat {
+      padding: 8px 18px;
+      border-radius: 12px;
+      background: #16213e;
+      min-width: 110px;
+    }
+    .stat .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: #999; }
+    .stat .value { font-size: 1.8rem; font-weight: bold; }
+    #time-value.low { color: var(--penalty); }
+    #score-value { color: var(--points); }
+    #best-value { color: #9b59ff; }
+
+    .misses { display: flex; gap: 6px; align-items: center; }
+    .miss-dot {
+      width: 16px; height: 16px; border-radius: 50%;
+      border: 2px solid #666; background: transparent;
+    }
+    .miss-dot.on { background: var(--penalty); border-color: var(--penalty); }
+
+    .status { min-height: 1.5rem; font-weight: bold; margin: 6px 0 12px; }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      max-width: 520px;
+      width: 100%;
+      cursor: none;            /* the hammer replaces the cursor */
+      touch-action: manipulation;
+    }
+    .hole {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      background: radial-gradient(ellipse at 50% 38%, var(--hole) 60%, var(--hole-rim) 62%, var(--grass) 64%);
+      border-radius: 50%;
+      overflow: hidden;
+      user-select: none;
+    }
+    .creature {
+      position: absolute;
+      left: 0; right: 0; bottom: 6%;
+      font-size: clamp(1.8rem, 8vw, 2.8rem);
+      transform: translateY(120%);
+      transition: transform 0.18s ease-out;
+      pointer-events: none;     /* clicks register on the hole */
+    }
+    .hole.up .creature { transform: translateY(0); }
+    .hole.bonk .creature { transform: translateY(0) scale(0.7); }
+    /* yellow dragon: gold tint on the emoji + yellow rim */
+    .hole.dragon { box-shadow: inset 0 0 0 3px var(--points); }
+    .hole.dragon .creature { filter: sepia(1) saturate(6) hue-rotate(2deg) brightness(1.1); }
+    .hole.bomb { box-shadow: inset 0 0 0 3px #555; }
+    /* Sonic: a fast blue hedgehog */
+    .hole.sonic { box-shadow: inset 0 0 0 3px #3aa9ff, 0 0 14px #3aa9ff; }
+    .hole.sonic .creature svg {
+      width: clamp(2.4rem, 11vw, 3.6rem);
+      height: clamp(2.4rem, 11vw, 3.6rem);
+      margin: 0 auto;
+    }
+
+    .float {
+      position: absolute;
+      left: 50%; top: 30%;
+      transform: translateX(-50%);
+      font-weight: bold;
+      font-size: 1.1rem;
+      pointer-events: none;
+      animation: floatUp 0.7s ease-out forwards;
+    }
+    .float.bonus { color: var(--bonus); }
+    .float.points { color: var(--points); }
+    .float.penalty { color: var(--penalty); }
+    @keyframes floatUp {
+      from { opacity: 1; top: 30%; }
+      to   { opacity: 0; top: -10%; }
+    }
+
+    #hammer {
+      position: fixed;
+      left: 0; top: 0;
+      font-size: 2.6rem;
+      pointer-events: none;
+      transform: translate(-30%, -60%) rotate(-20deg);
+      transition: transform 0.07s ease-out;
+      z-index: 50;
+      display: none;
+    }
+    #hammer.whack { transform: translate(-30%, -60%) rotate(45deg); }
+
+    .btn {
+      margin-top: 22px;
+      padding: 12px 28px;
+      font-size: 1.05rem;
+      color: #fff;
+      background: var(--accent);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .btn:hover { opacity: 0.9; }
+
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      cursor: default;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: #16213e;
+      border: 2px solid var(--penalty);
+      border-radius: 16px;
+      padding: 28px 32px;
+      max-width: 420px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      animation: pop 0.2s ease-out;
+    }
+    @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .modal.good { border-color: #3aa9ff; }
+    .modal.good .modal-title { color: #3aa9ff !important; }
+    .modal-title { font-size: 1.8rem; font-weight: bold; color: var(--penalty); margin-bottom: 6px; }
+    .modal-q { font-size: 1.1rem; margin-bottom: 18px; }
+    .modal-btns { display: flex; gap: 14px; justify-content: center; }
+    .modal-btn {
+      font-size: 1.05rem; font-weight: bold;
+      padding: 14px 22px;
+      border: none; border-radius: 10px;
+      color: #1a1a2e; cursor: pointer;
+    }
+    .modal-btn.points { background: var(--points); }
+    .modal-btn.seconds { background: var(--bonus); }
+    .modal-btn:hover { filter: brightness(1.1); }
+    .modal-note { margin-top: 16px; font-size: 0.8rem; color: #999; }
+    .hint { color: #888; font-size: 0.85rem; margin-top: 10px; max-width: 500px; line-height: 1.5; }
+    .hint b.h { color: var(--bonus); }
+    .hint b.d { color: var(--points); }
+    .hint b.p { color: var(--penalty); }
+  </style>
+</head>
+<body>
+  <h1>🔨 Whack-a-Hedgehog 🦔🐉</h1>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="label">Time</div>
+      <div class="value" id="time-value">1:00</div>
+    </div>
+    <div class="stat">
+      <div class="label">Points</div>
+      <div class="value" id="score-value">0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Speed</div>
+      <div class="value" id="speed-value">1.0×</div>
+    </div>
+    <div class="stat">
+      <div class="label">Best</div>
+      <div class="value" id="best-value">0</div>
+    </div>
+    <div class="misses" title="3 wrong hits in a row = −5s">
+      <span class="miss-dot" id="dot-0"></span>
+      <span class="miss-dot" id="dot-1"></span>
+      <span class="miss-dot" id="dot-2"></span>
+    </div>
+  </div>
+
+  <div class="status" id="status">Press Start, then start whacking!</div>
+
+  <div class="board" id="board"></div>
+
+  <button class="btn" id="start">Start Game</button>
+
+  <p class="hint">
+    🦔 <b class="h">Hedgehogs</b> give you <b class="h">+3 seconds</b> (up 3s) — but no points.<br>
+    🐉 The yellow <b class="d">3-headed dragon</b> has a head in 3 holes (up 5s) — whack <b class="d">all 3</b> for <b class="d">3 points</b>. One dragon at a time.<br>
+    💣 At <b class="p">5 points</b> bombs appear — hit one and <b class="p">time freezes</b> while you choose: lose <b class="p">10 points</b> or <b class="p">10 seconds</b>. Faster = more bombs.<br>
+    💨 <b style="color:#3aa9ff">Sonic</b> is rare &amp; <b style="color:#3aa9ff">moves every second</b> (up 5s) — catch the blue porcupine to <b style="color:#3aa9ff">gain 5 points or 5 seconds</b>!<br>
+    🔨 Hammer an empty hole <b class="p">3 times in a row</b> and you lose <b class="p">5 seconds</b>.
+  </p>
+
+  <div id="hammer">🔨</div>
+
+  <div class="modal-overlay" id="bomb-modal">
+    <div class="modal" id="modal-box">
+      <div class="modal-title" id="modal-title">💣 BOOM!</div>
+      <div class="modal-q" id="modal-q">Would you rather lose…</div>
+      <div class="modal-btns">
+        <button class="modal-btn points" id="choose-points">−10 Points</button>
+        <button class="modal-btn seconds" id="choose-seconds">−10 Seconds</button>
+      </div>
+      <div class="modal-note">⏸ Time is frozen until you choose.</div>
+    </div>
+  </div>
+
+  <script>
+    const SIZE = 5;
+    const HOLES = SIZE * SIZE;       // 25
+    const START_TIME = 60;           // starting seconds (1:00)
+    const HEDGEHOG_MS = 3000;        // a hedgehog stays up 3 seconds
+    const DRAGON_MS = 5000;          // a dragon stays up 5 seconds
+    const SPAWN_MS = 850;            // how often a hedgehog tries to pop up
+    const DRAGON_SPAWN_MS = 5000;    // how often a dragon may appear (if none up)
+    const HEDGEHOG_BONUS = 3;        // +3 seconds per hedgehog
+    const DRAGON_POINTS = 3;         // points for slaying ALL 3 heads of a dragon
+    const MISS_PENALTY = 5;          // -5 seconds for 3 wrong hits in a row
+    const MISS_LIMIT = 3;            // wrong hits in a row before the penalty
+    // Bombs: start appearing once you reach this score; more of them at higher speed.
+    const BOMB_AT_SCORE = 5;
+    const BOMB_MS = 2500;            // a bomb stays up 2.5s (don't hit it!)
+    const BOMB_SPAWN_MS = 3000;      // base gap between bombs (divided by speed)
+    const BOMB_POINTS_PENALTY = 10;  // hit a bomb → choose: lose 10 points…
+    const BOMB_TIME_PENALTY = 10;    //                  …or lose 10 seconds
+    const HS_KEY = "hedgehog-highscore";
+    // Sonic: rare moving bonus — hit it to GAIN 5 points or 5 seconds.
+    const SONIC_MS = 5000;           // stays up 5 seconds
+    const SONIC_MOVE_MS = 1000;      // moves 1 square every second
+    const SONIC_SPAWN_MS = 5000;     // base gap between spawn checks…
+    const SONIC_CHANCE = 0.65;       // …and this chance each check (more likely now)
+    const SONIC_POINTS = 5;
+    const SONIC_SECONDS = 5;
+
+    let timeLeft, score, wrongStreak, running, paused;
+    let type;                        // per hole: null | "hedgehog" | "dragon"
+    let up;                          // per hole: occupied (creature up)
+    let hideTimers;                  // per-hole timeout (hedgehogs)
+    let dragon;                      // { active, heads:[], timer, remaining }
+    let sonic;                       // { active, index, moveTimer, lifeTimer }
+    let sonicsCaught;                // each catch makes the next Sonic move faster
+    let spawnTimer, dragonTimer, bombTimer, sonicTimer, countdownTimer;
+    let choiceHandler = null;        // callback for the current would-you-rather modal
+
+    const boardEl = document.getElementById("board");
+    const timeEl = document.getElementById("time-value");
+    const scoreEl = document.getElementById("score-value");
+    const speedEl = document.getElementById("speed-value");
+
+    // Animals get quicker as your score climbs: +4% speed per point, capped at 10×.
+    function speedFactor() { return Math.min(10, 1 + score * 0.04); }
+    function hedgehogUpMs() { return Math.max(450, Math.round(HEDGEHOG_MS / speedFactor())); }
+    function dragonUpMs()   { return Math.max(1200, Math.round(DRAGON_MS / speedFactor())); }
+    function hedgehogGapMs() { return Math.max(180, Math.round(SPAWN_MS / speedFactor())); }
+    function dragonGapMs()   { return Math.max(900, Math.round(DRAGON_SPAWN_MS / speedFactor())); }
+    function bombUpMs()      { return Math.max(700, Math.round(BOMB_MS / speedFactor())); }
+    function bombGapMs()     { return Math.max(300, Math.round(BOMB_SPAWN_MS / speedFactor())); }
+    // Each Sonic you catch makes the next one hop faster (floor 250ms).
+    function sonicMoveMs()   { return Math.max(250, Math.round(SONIC_MOVE_MS / (1 + sonicsCaught * 0.5))); }
+    const statusEl = document.getElementById("status");
+    const hammerEl = document.getElementById("hammer");
+    const startBtn = document.getElementById("start");
+    const bestEl = document.getElementById("best-value");
+    const bombModal = document.getElementById("bomb-modal");
+    const modalBox = document.getElementById("modal-box");
+    const modalTitle = document.getElementById("modal-title");
+    const modalQ = document.getElementById("modal-q");
+    const choosePointsBtn = document.getElementById("choose-points");
+    const chooseSecondsBtn = document.getElementById("choose-seconds");
+
+    function loadHigh() { return Number(localStorage.getItem(HS_KEY)) || 0; }
+
+    // --- build board ---
+    function buildBoard() {
+      boardEl.innerHTML = "";
+      for (let i = 0; i < HOLES; i++) {
+        const hole = document.createElement("div");
+        hole.className = "hole";
+        hole.dataset.index = i;
+        hole.innerHTML = '<div class="creature"></div>';
+        boardEl.appendChild(hole);
+      }
+    }
+    function holeEl(i) { return boardEl.children[i]; }
+
+    function formatTime(s) {
+      s = Math.max(0, s);
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return m + ":" + String(sec).padStart(2, "0");
+    }
+    function updateStats() {
+      timeEl.textContent = formatTime(timeLeft);
+      scoreEl.textContent = score;
+      timeEl.classList.toggle("low", timeLeft <= 5);
+      speedEl.textContent = speedFactor().toFixed(1) + "×";
+      for (let d = 0; d < MISS_LIMIT; d++) {
+        document.getElementById("dot-" + d).classList.toggle("on", d < wrongStreak);
+      }
+    }
+    function floatText(i, text, kind) {
+      const span = document.createElement("span");
+      span.className = "float " + kind;
+      span.textContent = text;
+      holeEl(i).appendChild(span);
+      setTimeout(() => span.remove(), 700);
+    }
+
+    // --- popping up / down ---
+    // A light-blue porcupine drawn as inline SVG (Sonic) — NOT a hedgehog emoji.
+    const PORCUPINE_SVG =
+      '<svg viewBox="0 0 100 100" width="100%" height="100%" style="display:block">' +
+        '<g fill="#1f6fc4">' +              // quills (darker blue)
+          '<polygon points="16,60 4,20 30,52"/>' +
+          '<polygon points="28,52 22,8 42,46"/>' +
+          '<polygon points="42,46 42,2 54,44"/>' +
+          '<polygon points="54,44 64,4 66,44"/>' +
+          '<polygon points="64,45 80,12 76,47"/>' +
+          '<polygon points="74,50 92,28 82,53"/>' +
+          '<polygon points="12,66 0,48 26,60"/>' +
+        '</g>' +
+        '<ellipse cx="48" cy="66" rx="36" ry="21" fill="#7ec4ff"/>' +   // body
+        '<ellipse cx="82" cy="69" rx="14" ry="11" fill="#a6d8ff"/>' +    // snout
+        '<rect x="32" y="83" width="7" height="11" rx="3" fill="#4a97e0"/>' + // legs
+        '<rect x="56" y="83" width="7" height="11" rx="3" fill="#4a97e0"/>' +
+        '<circle cx="95" cy="71" r="3.2" fill="#10243a"/>' +            // nose
+        '<circle cx="78" cy="64" r="3.4" fill="#10243a"/>' +            // eye
+        '<circle cx="79.2" cy="62.8" r="1.1" fill="#fff"/>' +           // eye shine
+      '</svg>';
+
+    function showCreature(i, emoji, kind) {
+      type[i] = kind;
+      up[i] = true;
+      const el = holeEl(i);
+      const c = el.querySelector(".creature");
+      if (kind === "sonic") { c.textContent = ""; c.innerHTML = PORCUPINE_SVG; }
+      else { c.innerHTML = ""; c.textContent = emoji; }
+      el.classList.add("up");
+      if (kind === "dragon") el.classList.add("dragon");
+      if (kind === "sonic") el.classList.add("sonic");
+    }
+    function popDown(i) {
+      up[i] = false;
+      type[i] = null;
+      const el = holeEl(i);
+      el.classList.remove("up", "bonk", "dragon", "sonic");
+      clearTimeout(hideTimers[i]);
+      hideTimers[i] = null;
+    }
+
+    function spawnHedgehog() {
+      if (!running || paused) return;
+      const free = [];
+      for (let i = 0; i < HOLES; i++) if (!up[i]) free.push(i);
+      if (free.length === 0) return;
+      const i = free[Math.floor(Math.random() * free.length)];
+      showCreature(i, "🦔", "hedgehog");
+      hideTimers[i] = setTimeout(() => popDown(i), hedgehogUpMs());
+    }
+
+    function spawnDragon() {
+      if (!running || paused || dragon.active) return;
+      const free = [];
+      for (let i = 0; i < HOLES; i++) if (!up[i]) free.push(i);
+      if (free.length < 3) return;
+      // pick 3 distinct holes
+      const heads = [];
+      while (heads.length < 3) {
+        const i = free[Math.floor(Math.random() * free.length)];
+        if (!heads.includes(i)) heads.push(i);
+      }
+      heads.forEach(i => showCreature(i, "🐉", "dragon"));
+      dragon = { active: true, heads: heads, remaining: 3, timer: null };
+      dragon.timer = setTimeout(escapeDragon, dragonUpMs());
+      statusEl.textContent = "🐉 A 3-headed dragon! Whack all 3 heads!";
+    }
+    function escapeDragon() {
+      dragon.heads.forEach(i => { if (type[i] === "dragon") popDown(i); });
+      dragon = { active: false, heads: [], remaining: 0, timer: null };
+    }
+
+    function spawnBomb() {
+      if (!running || paused || score < BOMB_AT_SCORE) return;
+      const free = [];
+      for (let i = 0; i < HOLES; i++) if (!up[i]) free.push(i);
+      if (free.length === 0) return;
+      const i = free[Math.floor(Math.random() * free.length)];
+      showCreature(i, "💣", "bomb");
+      hideTimers[i] = setTimeout(() => popDown(i), bombUpMs());
+    }
+
+    // Orthogonal neighbours (1 square away) that are currently empty.
+    function freeNeighbors(i) {
+      const r = Math.floor(i / SIZE), c = i % SIZE;
+      const cand = [];
+      if (r > 0)        cand.push(i - SIZE);
+      if (r < SIZE - 1) cand.push(i + SIZE);
+      if (c > 0)        cand.push(i - 1);
+      if (c < SIZE - 1) cand.push(i + 1);
+      return cand.filter(n => !up[n]);
+    }
+    function spawnSonic() {
+      if (!running || paused || sonic.active) return;
+      if (Math.random() >= SONIC_CHANCE) return;   // rare
+      const free = [];
+      for (let i = 0; i < HOLES; i++) if (!up[i]) free.push(i);
+      if (free.length === 0) return;
+      const i = free[Math.floor(Math.random() * free.length)];
+      showCreature(i, "🦔", "sonic");
+      sonic = { active: true, index: i, moveTimer: null, lifeTimer: null };
+      sonic.lifeTimer = setTimeout(escapeSonic, SONIC_MS);
+      sonic.moveTimer = setInterval(moveSonic, sonicMoveMs());
+      statusEl.textContent = "💨 Sonic appeared — catch him for a bonus!";
+    }
+    function moveSonic() {
+      if (!sonic.active || paused) return;
+      const options = freeNeighbors(sonic.index);
+      if (options.length === 0) return;            // boxed in — stay put this tick
+      const next = options[Math.floor(Math.random() * options.length)];
+      popDown(sonic.index);
+      showCreature(next, "🦔", "sonic");
+      sonic.index = next;
+    }
+    function escapeSonic() {
+      if (sonic.moveTimer) clearInterval(sonic.moveTimer);
+      if (sonic.lifeTimer) clearTimeout(sonic.lifeTimer);
+      if (type[sonic.index] === "sonic") popDown(sonic.index);
+      sonic = { active: false, index: -1, moveTimer: null, lifeTimer: null };
+    }
+
+    // --- clicking ---
+    function onBoardClick(e) {
+      if (!running || paused) return;
+      const hole = e.target.closest(".hole");
+      if (!hole) return;
+      const i = Number(hole.dataset.index);
+
+      if (up[i] && type[i] === "hedgehog") {
+        // hedgehog → time bonus, no points
+        timeLeft += HEDGEHOG_BONUS;
+        wrongStreak = 0;
+        hole.classList.add("bonk");
+        floatText(i, "+" + HEDGEHOG_BONUS + "s", "bonus");
+        setTimeout(() => popDown(i), 120);
+        statusEl.textContent = "Hedgehog! +" + HEDGEHOG_BONUS + " seconds";
+      } else if (up[i] && type[i] === "dragon") {
+        // dragon head → no points yet; you must slay ALL 3 heads
+        wrongStreak = 0;
+        hole.classList.add("bonk");
+        setTimeout(() => popDown(i), 120);
+        dragon.remaining--;
+        dragon.heads = dragon.heads.filter(h => h !== i);
+        if (dragon.remaining <= 0) {
+          clearTimeout(dragon.timer);
+          dragon.active = false;
+          score += DRAGON_POINTS;
+          floatText(i, "+" + DRAGON_POINTS, "points");
+          statusEl.textContent = "🐉 Dragon slain! +" + DRAGON_POINTS + " points!";
+        } else {
+          floatText(i, (3 - dragon.remaining) + "/3", "points");
+          statusEl.textContent = "Dragon head down — " + (3 - dragon.remaining) + "/3, get the rest!";
+        }
+      } else if (up[i] && type[i] === "sonic") {
+        // sonic → freeze time, "would you rather GAIN 5 points or 5 seconds?"
+        wrongStreak = 0;
+        sonicsCaught++;        // next Sonic will move faster
+        hole.classList.add("bonk");
+        escapeSonic();
+        openSonicModal();
+        return;
+      } else if (up[i] && type[i] === "bomb") {
+        // bomb → freeze time, "would you rather LOSE 10 points or 10 seconds?"
+        wrongStreak = 0;
+        hole.classList.add("bonk");
+        setTimeout(() => popDown(i), 120);
+        openBombModal();
+        return;
+      } else {
+        // empty hole → miss
+        wrongStreak++;
+        if (wrongStreak >= MISS_LIMIT) {
+          timeLeft -= MISS_PENALTY;
+          wrongStreak = 0;
+          floatText(i, "-" + MISS_PENALTY + "s", "penalty");
+          statusEl.textContent = "Missed 3 in a row! -" + MISS_PENALTY + " seconds";
+          if (timeLeft <= 0) { updateStats(); return endGame(); }
+        } else {
+          statusEl.textContent = "Missed! (" + wrongStreak + "/" + MISS_LIMIT + ")";
+        }
+      }
+      updateStats();
+    }
+
+    // --- self-rescheduling spawners (faster as score rises) ---
+    function scheduleHedgehog() {
+      if (!running) return;
+      spawnHedgehog();
+      spawnTimer = setTimeout(scheduleHedgehog, hedgehogGapMs());
+    }
+    function scheduleDragon() {
+      if (!running) return;
+      spawnDragon();
+      dragonTimer = setTimeout(scheduleDragon, dragonGapMs());
+    }
+    function scheduleBomb() {
+      if (!running) return;
+      spawnBomb();
+      // gap shrinks with speed → the faster you go, the more bombs
+      bombTimer = setTimeout(scheduleBomb, bombGapMs());
+    }
+    function scheduleSonic() {
+      if (!running) return;
+      spawnSonic();
+      sonicTimer = setTimeout(scheduleSonic, SONIC_SPAWN_MS);
+    }
+
+    // --- "would you rather" questions (bombs lose, sonic gains) ---
+    function openChoice(opts) {
+      paused = true;        // stop time until answered
+      modalTitle.textContent = opts.title;
+      modalQ.textContent = opts.question;
+      choosePointsBtn.textContent = opts.pointsLabel;
+      chooseSecondsBtn.textContent = opts.secondsLabel;
+      modalBox.classList.toggle("good", !!opts.good);
+      choiceHandler = opts.onChoose;
+      statusEl.textContent = opts.status;
+      bombModal.classList.add("show");
+    }
+    function answerChoice(kind) {
+      if (!choiceHandler) return;
+      bombModal.classList.remove("show");
+      paused = false;
+      const handler = choiceHandler;
+      choiceHandler = null;
+      handler(kind);
+      updateStats();
+      if (timeLeft <= 0) endGame();
+    }
+    function openBombModal() {
+      openChoice({
+        title: "💣 BOOM!",
+        question: "Would you rather LOSE…",
+        pointsLabel: "−" + BOMB_POINTS_PENALTY + " Points",
+        secondsLabel: "−" + BOMB_TIME_PENALTY + " Seconds",
+        status: "💣 Bomb! Choose your penalty…",
+        good: false,
+        onChoose: kind => {
+          if (kind === "points") {
+            score = Math.max(0, score - BOMB_POINTS_PENALTY);
+            statusEl.textContent = "💣 You lost " + BOMB_POINTS_PENALTY + " points.";
+          } else {
+            timeLeft -= BOMB_TIME_PENALTY;
+            statusEl.textContent = "💣 You lost " + BOMB_TIME_PENALTY + " seconds.";
+          }
+        }
+      });
+    }
+    function openSonicModal() {
+      openChoice({
+        title: "💨 Gotta go fast!",
+        question: "Would you rather GAIN…",
+        pointsLabel: "+" + SONIC_POINTS + " Points",
+        secondsLabel: "+" + SONIC_SECONDS + " Seconds",
+        status: "💨 You caught Sonic! Choose your reward…",
+        good: true,
+        onChoose: kind => {
+          if (kind === "points") {
+            score += SONIC_POINTS;
+            statusEl.textContent = "💨 +" + SONIC_POINTS + " points!";
+          } else {
+            timeLeft += SONIC_SECONDS;
+            statusEl.textContent = "💨 +" + SONIC_SECONDS + " seconds!";
+          }
+        }
+      });
+    }
+
+    // --- timer ---
+    function tick() {
+      if (paused) return;   // bomb question freezes the clock
+      timeLeft--;
+      updateStats();
+      if (timeLeft <= 0) endGame();
+    }
+
+    // --- game flow ---
+    function startGame() {
+      buildBoard();
+      timeLeft = START_TIME;
+      score = 0;
+      wrongStreak = 0;
+      running = true;
+      paused = false;
+      bombModal.classList.remove("show");
+      bestEl.textContent = loadHigh();
+      type = new Array(HOLES).fill(null);
+      up = new Array(HOLES).fill(false);
+      hideTimers = new Array(HOLES).fill(null);
+      dragon = { active: false, heads: [], remaining: 0, timer: null };
+      sonic = { active: false, index: -1, moveTimer: null, lifeTimer: null };
+      sonicsCaught = 0;
+      choiceHandler = null;
+      updateStats();
+      statusEl.textContent = "Go! 🦔🐉";
+      startBtn.textContent = "Restart";
+      clearTimeout(spawnTimer);
+      clearTimeout(dragonTimer);
+      clearTimeout(bombTimer);
+      clearTimeout(sonicTimer);
+      clearInterval(countdownTimer);
+      scheduleHedgehog();
+      scheduleDragon();
+      scheduleBomb();
+      scheduleSonic();
+      countdownTimer = setInterval(tick, 1000);
+    }
+
+    function endGame() {
+      running = false;
+      clearTimeout(spawnTimer);
+      clearTimeout(dragonTimer);
+      clearTimeout(bombTimer);
+      clearTimeout(sonicTimer);
+      clearInterval(countdownTimer);
+      if (dragon.timer) clearTimeout(dragon.timer);
+      if (sonic.moveTimer) clearInterval(sonic.moveTimer);
+      if (sonic.lifeTimer) clearTimeout(sonic.lifeTimer);
+      for (let i = 0; i < HOLES; i++) popDown(i);
+      dragon = { active: false, heads: [], remaining: 0, timer: null };
+      timeLeft = 0;
+      updateStats();
+      const best = loadHigh();
+      if (score > best) {
+        localStorage.setItem(HS_KEY, score);
+        bestEl.textContent = score;
+        statusEl.textContent = "⏰ Time's up! 🏆 New high score: " + score + " points!";
+      } else {
+        statusEl.textContent = "⏰ Time's up! Final score: " + score + " (best: " + best + ").";
+      }
+    }
+
+    // --- hammer cursor ---
+    document.addEventListener("mousemove", e => {
+      hammerEl.style.display = "block";
+      hammerEl.style.left = e.clientX + "px";
+      hammerEl.style.top = e.clientY + "px";
+    });
+    document.addEventListener("mousedown", () => {
+      hammerEl.classList.add("whack");
+      setTimeout(() => hammerEl.classList.remove("whack"), 110);
+    });
+
+    boardEl.addEventListener("click", onBoardClick);
+    startBtn.addEventListener("click", startGame);
+    choosePointsBtn.addEventListener("click", () => answerChoice("points"));
+    chooseSecondsBtn.addEventListener("click", () => answerChoice("seconds"));
+
+    buildBoard();
+    bestEl.textContent = loadHigh();
+  </script>
+</body>
+</html>
