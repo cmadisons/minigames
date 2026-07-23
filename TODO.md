@@ -1,0 +1,1 @@
+reset high scores and make pac man ghost respawn after you eat them

@@ -31,15 +31,15 @@
     }
 
     h1 { margin-bottom: 8px; font-size: 2rem; }
-    .subtitle { color: #888; margin-bottom: 20px; }
+    .subtitle { color: #9aa0b5; font-size: 0.95rem; margin-bottom: 18px; line-height: 1.5; }
 
-    .modes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 22px; }
+    .modes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
     .mode-btn {
-      font-size: 0.85rem; padding: 7px 14px; border: 1px solid #555;
-      border-radius: 8px; background: var(--card); color: var(--text); cursor: pointer;
+      font-size: 0.85rem; padding: 8px 16px; border: 1px solid #33415e; border-radius: 999px;
+      background: #16213e; color: #eaeaea; cursor: pointer; transition: border-color .12s, background .12s, color .12s;
     }
     .mode-btn:hover { border-color: var(--accent); }
-    .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 
     .input-row { display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; }
 
@@ -77,8 +77,9 @@
     .feedback.low { color: var(--low); }
     .feedback.correct { color: var(--correct); }
 
-    .stats { color: #aaa; margin-bottom: 16px; }
+    .stats { color: #8890a6; margin-bottom: 16px; }
     .stats span { color: var(--text); font-weight: bold; }
+    #best { color: #ffd23f; }
 
     .actions { margin-top: 16px; min-height: 44px; }
     .save-btn { background: var(--correct); }

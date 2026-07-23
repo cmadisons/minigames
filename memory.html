@@ -24,7 +24,8 @@
       padding: 20px;
       text-align: center;
     }
-    h1 { margin: 4px 0 12px; font-size: 1.7rem; }
+    h1 { margin: 4px 0 8px; font-size: 1.7rem; }
+    .subtitle { color: #9aa0b5; font-size: 0.95rem; margin-bottom: 18px; line-height: 1.5; }
 
     .modes {
       display: flex;
@@ -35,16 +36,11 @@
       max-width: 560px;
     }
     .mode-btn {
-      font-size: 0.85rem;
-      padding: 8px 14px;
-      border: 1px solid #555;
-      border-radius: 8px;
-      background: var(--card);
-      color: var(--text);
-      cursor: pointer;
+      font-size: 0.85rem; padding: 8px 16px; border: 1px solid #33415e; border-radius: 999px;
+      background: #16213e; color: var(--text); cursor: pointer; transition: border-color .12s, background .12s, color .12s;
     }
     .mode-btn:hover { border-color: var(--accent); }
-    .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 
     .scoreboard {
       display: flex;
@@ -54,15 +50,13 @@
       margin-bottom: 12px;
     }
     .score-box {
-      padding: 8px 18px;
-      border-radius: 12px;
-      background: var(--card);
-      border: 2px solid transparent;
-      min-width: 110px;
+      padding: 10px 18px; border-radius: 12px; background: #16213e;
+      border: 2px solid transparent; min-width: 92px;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
     }
     .score-box.active { border-color: var(--pc, var(--accent)); box-shadow: 0 0 0 1px var(--pc, var(--accent)); }
-    .score-box .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: var(--pc, #999); font-weight: bold; }
-    .score-box .value { font-size: 1.7rem; font-weight: bold; }
+    .score-box .label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1px; color: var(--pc, #8890a6); font-weight: 600; }
+    .score-box .value { font-size: 1.7rem; font-weight: bold; line-height: 1.1; }
 
     .status { min-height: 1.6rem; font-size: 1.1rem; font-weight: bold; margin-bottom: 14px; }
 
@@ -143,6 +137,7 @@
     <a class="back" href="index.html" title="Back to home">← Home</a>
   </nav>
   <h1>🃏 Memory Match</h1>
+  <p class="subtitle">Flip cards to find matching pairs — collect more than the computer!</p>
 
   <div class="modes" id="modes"></div>
 
@@ -150,7 +145,7 @@
 
   <div class="status" id="status"></div>
 
-  <div class="status" id="record" style="min-height:1rem;font-size:0.9rem;color:#9b59ff;margin-top:-8px;"></div>
+  <div class="status" id="record" style="min-height:1rem;font-size:0.9rem;color:#ffd23f;margin-top:-8px;"></div>
 
   <div class="board" id="board"></div>
 
