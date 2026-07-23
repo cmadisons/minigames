@@ -218,6 +218,7 @@
       <a href="1-100.html">🔢 1–100</a>
       <a href="hedgehog.html" class="active">🦔 Whack</a>
       <a href="memory.html">🧠 Memory</a>
+      <a href="pacman.html">👾 Pac-Man</a>
     </div>
   </nav>
   <h1>🔨 Whack-a-Hedgehog 🦔🐉</h1>
@@ -279,15 +280,16 @@
   <script>
     const SIZE = 5;
     const HOLES = SIZE * SIZE;       // 25
-    // Difficulty modes — each sets the starting time AND keeps its own high score.
+    // Speed modes — each STARTS the creatures at a different speed multiplier
+    // and keeps its own high score. (Speed still ramps up with your score.)
     const MODES = {
-      easy:   { label: "Easy 90s",   time: 90 },
-      normal: { label: "Normal 60s", time: 60 },
-      hard:   { label: "Hard 30s",   time: 30 },
+      slow:   { label: "🐢 Slow ×1",   startSpeed: 1 },
+      fast:   { label: "🐇 Fast ×3",   startSpeed: 3 },
+      insane: { label: "🔥 Insane ×5", startSpeed: 5 },
     };
-    const MODE_ORDER = ["easy", "normal", "hard"];
-    let modeKey = "normal";
-    let START_TIME = MODES[modeKey].time;   // starting seconds
+    const MODE_ORDER = ["slow", "fast", "insane"];
+    let modeKey = "slow";
+    const START_TIME = 60;                  // starting seconds (same for every mode)
     const HEDGEHOG_MS = 3000;        // a hedgehog stays up 3 seconds
     const DRAGON_MS = 5000;          // a dragon stays up 5 seconds
     const SPAWN_MS = 850;            // how often a hedgehog tries to pop up
@@ -326,8 +328,9 @@
     const scoreEl = document.getElementById("score-value");
     const speedEl = document.getElementById("speed-value");
 
-    // Animals get quicker as your score climbs: +4% speed per point, capped at 10×.
-    function speedFactor() { return Math.min(10, 1 + score * 0.04); }
+    // Animals get quicker as your score climbs: the mode sets the STARTING speed,
+    // then +4% per point on top of that, capped at 10×.
+    function speedFactor() { return Math.min(10, MODES[modeKey].startSpeed + score * 0.04); }
     function hedgehogUpMs() { return Math.max(450, Math.round(HEDGEHOG_MS / speedFactor())); }
     function dragonUpMs()   { return Math.max(1200, Math.round(DRAGON_MS / speedFactor())); }
     function hedgehogGapMs() { return Math.max(180, Math.round(SPAWN_MS / speedFactor())); }
@@ -744,10 +747,10 @@
     function setMode(key) {
       if (running) return;   // finish the current game before switching
       modeKey = key;
-      START_TIME = MODES[key].time;
       buildModeButtons();
-      bestEl.textContent = loadHigh();          // this mode's own high score
+      bestEl.textContent = loadHigh();                       // this mode's own high score
       timeEl.textContent = formatTime(START_TIME);
+      speedEl.textContent = MODES[key].startSpeed.toFixed(1) + "×";  // preview starting speed
     }
 
     boardEl.addEventListener("click", onBoardClick);
@@ -756,9 +759,7 @@
     chooseSecondsBtn.addEventListener("click", () => answerChoice("seconds"));
 
     buildBoard();
-    buildModeButtons();
-    bestEl.textContent = loadHigh();
-    timeEl.textContent = formatTime(START_TIME);
+    setMode(modeKey);   // builds mode buttons, shows this mode's best + starting speed
   </script>
 </body>
 </html>
