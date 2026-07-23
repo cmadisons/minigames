@@ -178,6 +178,12 @@
 
     const HS_KEY = "pacman-highscore";
     function loadHigh() { return Number(localStorage.getItem(HS_KEY)) || 0; }
+    // Append a result to a shared leaderboard list (read by the menu page).
+    function pushRecord(key, entry) {
+      let a; try { a = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { a = []; }
+      a.push(entry); if (a.length > 50) a = a.slice(-50);
+      localStorage.setItem(key, JSON.stringify(a));
+    }
 
     const DIRS = {
       up:    { x: 0, y: -1 },
@@ -432,6 +438,7 @@
         : "💀 Game over! Score: " + score + " (best " + best + ")";
       statusEl.textContent = msg;
       startBtn.textContent = "Play Again";
+      pushRecord("records-pacman", { score: score, date: Date.now() });
     }
 
     // ---- main loop ----

@@ -33,27 +33,48 @@
       width: 100%;
       max-width: 760px;
     }
-    a.game {
+    .card {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 12px;
       background: var(--card);
       border: 1px solid rgba(255,255,255,0.06);
       border-radius: 16px;
-      padding: 28px 20px;
-      text-decoration: none;
-      color: var(--text);
+      overflow: hidden;
       transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
     }
-    a.game:hover {
+    .card:hover {
       transform: translateY(-4px);
       border-color: var(--accent);
       box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     }
+    a.game {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 26px 20px 18px;
+      text-decoration: none;
+      color: var(--text);
+    }
     .icon { font-size: 3rem; }
     .name { font-size: 1.2rem; font-weight: 600; }
     .desc { font-size: 0.85rem; color: var(--muted); }
+
+    .board { padding: 0 16px 16px; }
+    .board .rtitle {
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px;
+      color: var(--muted); margin-bottom: 6px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px;
+    }
+    .board ol { list-style: none; margin: 0; padding: 0; text-align: left; }
+    .board li {
+      display: flex; align-items: baseline; gap: 8px;
+      font-size: 0.82rem; padding: 3px 6px; border-radius: 6px; color: #cfd3e0;
+    }
+    .board li:first-child { background: rgba(255,210,63,0.14); }
+    .board .rank { color: var(--muted); width: 1.7em; flex-shrink: 0; }
+    .board .val { font-weight: 700; color: #fff; }
+    .board .mode { margin-left: auto; color: var(--muted); font-size: 0.74rem; }
+    .board .empty { color: var(--muted); font-style: italic; font-size: 0.82rem; }
     footer { margin-top: 40px; color: var(--muted); font-size: 0.8rem; }
 
     .topbar {
@@ -87,33 +108,70 @@
   <p class="subtitle">Pick a game to play</p>
 
   <div class="grid">
-    <a class="game" href="rock-paper-scissors.html">
-      <span class="icon">✊</span>
-      <span class="name">Rock Paper Scissors</span>
-      <span class="desc">Beat the computer, best of luck</span>
-    </a>
-    <a class="game" href="1-100.html">
-      <span class="icon">🔢</span>
-      <span class="name">Guess 1–100</span>
-      <span class="desc">Find the secret number</span>
-    </a>
-    <a class="game" href="hedgehog.html">
-      <span class="icon">🦔</span>
-      <span class="name">Whack-a-Hedgehog</span>
-      <span class="desc">Tap them before they hide</span>
-    </a>
-    <a class="game" href="memory.html">
-      <span class="icon">🧠</span>
-      <span class="name">Memory Match</span>
-      <span class="desc">Flip and match the pairs</span>
-    </a>
-    <a class="game" href="pacman.html">
-      <span class="icon">👾</span>
-      <span class="name">Pac-Man</span>
-      <span class="desc">Eat the dots, dodge the ghosts</span>
-    </a>
+    <div class="card">
+      <a class="game" href="rock-paper-scissors.html">
+        <span class="icon">✊</span>
+        <span class="name">Rock Paper Scissors</span>
+        <span class="desc">Beat the computer, best of luck</span>
+      </a>
+    </div>
+    <div class="card">
+      <a class="game" href="1-100.html">
+        <span class="icon">🔢</span>
+        <span class="name">Guess 1–100</span>
+        <span class="desc">Find the secret number</span>
+      </a>
+      <div class="board" data-key="records-guess" data-dir="asc" data-unit="guesses"></div>
+    </div>
+    <div class="card">
+      <a class="game" href="hedgehog.html">
+        <span class="icon">🦔</span>
+        <span class="name">Whack-a-Hedgehog</span>
+        <span class="desc">Tap them before they hide</span>
+      </a>
+      <div class="board" data-key="records-hedgehog" data-dir="desc" data-unit="pts"></div>
+    </div>
+    <div class="card">
+      <a class="game" href="memory.html">
+        <span class="icon">🧠</span>
+        <span class="name">Memory Match</span>
+        <span class="desc">Flip and match the pairs</span>
+      </a>
+      <div class="board" data-key="records-memory" data-dir="desc" data-unit="pairs"></div>
+    </div>
+    <div class="card">
+      <a class="game" href="pacman.html">
+        <span class="icon">👾</span>
+        <span class="name">Pac-Man</span>
+        <span class="desc">Eat the dots, dodge the ghosts</span>
+      </a>
+      <div class="board" data-key="records-pacman" data-dir="desc" data-unit="pts"></div>
+    </div>
   </div>
 
   <footer>Built with plain HTML, CSS &amp; JavaScript</footer>
+
+  <script>
+    // Read each game's saved score list from localStorage and show its top 10.
+    function esc(s) { return String(s).replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c])); }
+    document.querySelectorAll(".board").forEach(el => {
+      const { key, dir, unit } = el.dataset;
+      let list; try { list = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { list = []; }
+      list = list.filter(r => r && typeof r.score === "number");
+      list.sort((a, b) => dir === "asc" ? a.score - b.score : b.score - a.score);
+      const top = list.slice(0, 10);
+      let html = '<div class="rtitle">🏆 Top 10</div>';
+      if (!top.length) {
+        html += '<div class="empty">No scores yet — go play!</div>';
+      } else {
+        html += "<ol>" + top.map((r, i) =>
+          '<li><span class="rank">' + (i + 1) + '.</span>' +
+          '<span class="val">' + esc(r.score) + " " + esc(unit) + "</span>" +
+          (r.mode ? '<span class="mode">' + esc(r.mode) + "</span>" : "") +
+          "</li>").join("") + "</ol>";
+      }
+      el.innerHTML = html;
+    });
+  </script>
 </body>
 </html>

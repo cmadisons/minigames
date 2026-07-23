@@ -224,6 +224,13 @@
     function loadBest() { const v = Number(localStorage.getItem(BEST_PREFIX + modeKey)); return v > 0 ? v : null; }
     function showBest() { const b = loadBest(); bestEl.textContent = b ? b : "–"; }
 
+    // Append a result to a shared leaderboard list (read by the menu page).
+    function pushRecord(key, entry) {
+      let a; try { a = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { a = []; }
+      a.push(entry); if (a.length > 50) a = a.slice(-50);
+      localStorage.setItem(key, JSON.stringify(a));
+    }
+
     // Mode buttons: pick a difficulty, which sets the range and its own high score.
     const modesEl = document.getElementById("modes");
     const rangeDescEl = document.getElementById("range-desc");
@@ -344,6 +351,7 @@
           feedbackEl.textContent = "🎉 Correct! You got it in " + guessCount + " " + word + "!";
         }
         feedbackEl.className = "feedback correct";
+        pushRecord("records-guess", { score: guessCount, mode: MIN + "–" + MAX, date: Date.now() });
         addChip(value, "correct");
         gameOver = true;
         inputEl.disabled = true;

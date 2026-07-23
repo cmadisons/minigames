@@ -351,6 +351,12 @@
     const chooseSecondsBtn = document.getElementById("choose-seconds");
 
     function loadHigh() { return Number(localStorage.getItem(HS_PREFIX + modeKey)) || 0; }
+    // Append a result to a shared leaderboard list (read by the menu page).
+    function pushRecord(key, entry) {
+      let a; try { a = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { a = []; }
+      a.push(entry); if (a.length > 50) a = a.slice(-50);
+      localStorage.setItem(key, JSON.stringify(a));
+    }
 
     // --- build board ---
     function buildBoard() {
@@ -719,6 +725,7 @@
       } else {
         statusEl.textContent = "⏰ Time's up! Final score: " + score + " (best: " + best + ").";
       }
+      pushRecord("records-hedgehog", { score: score, mode: "×" + MODES[modeKey].startSpeed, date: Date.now() });
     }
 
     // --- hammer cursor ---

@@ -211,20 +211,19 @@
     const scoreboardEl = document.getElementById("scoreboard");
     const recordEl = document.getElementById("record");
 
-    // High score = your longest streak of games beating the computer.
-    // Tracked SEPARATELY for each difficulty (easy / mid / hard / perfect).
-    const STREAK_PREFIX = "memory-cpu-streak-";        // + modeKey → current run
-    const BEST_PREFIX = "memory-cpu-streak-best-";     // + modeKey → high score
-    function isCpuModeKey(key) {
-      return !!(MODES[key] && MODES[key].players.some(p => p.type === "cpu"));
-    }
-    function loadStreak(key) { return Number(localStorage.getItem(STREAK_PREFIX + key)) || 0; }
-    function loadBest(key)   { return Number(localStorage.getItem(BEST_PREFIX + key)) || 0; }
+    // High score (per mode) = the most pairs you've ever collected in that mode.
+    const BEST_PREFIX = "memory-best-";     // + modeKey → best pairs collected
+    const MODE_SHORT = { easy: "Easy", mid: "Mid", hard: "Hard", perfect: "Perfect", two: "2P", three: "3P" };
+    function loadBest(key) { return Number(localStorage.getItem(BEST_PREFIX + key)) || 0; }
     function showRecord() {
-      if (!isCpuModeKey(modeKey)) { recordEl.textContent = ""; return; }
       recordEl.textContent =
-        "🏆 " + MODES[modeKey].label + " streak: " + loadStreak(modeKey) +
-        " · Best: " + loadBest(modeKey);
+        "🏆 " + (MODE_SHORT[modeKey] || modeKey) + " best: " + loadBest(modeKey) + " pairs";
+    }
+    // Append a result to a shared leaderboard list (read by the menu page).
+    function pushRecord(key, entry) {
+      let a; try { a = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { a = []; }
+      a.push(entry); if (a.length > 50) a = a.slice(-50);
+      localStorage.setItem(key, JSON.stringify(a));
     }
 
     // --- mode buttons ---
@@ -339,23 +338,15 @@
       statusEl.textContent = msg;
       [...scoreboardEl.children].forEach(b => b.classList.remove("active"));
 
-      // Update the beat-the-computer streak for THIS mode (modes with a computer only).
-      const you = players.find(p => p.type === "human");
-      if (isCpuModeKey(modeKey) && you) {
-        const youWon = winners.length === 1 && winners[0] === you;
-        let streak = loadStreak(modeKey);
-        if (youWon) {
-          streak++;
-          if (streak > loadBest(modeKey)) {
-            localStorage.setItem(BEST_PREFIX + modeKey, streak);
-            statusEl.textContent = msg + " 🏆 New " + MODES[modeKey].label + " best: " + streak + "!";
-          }
-        } else {
-          streak = 0;   // a loss or tie breaks the streak
-        }
-        localStorage.setItem(STREAK_PREFIX + modeKey, streak);
-        showRecord();
+      // Record the most pairs YOU collected this game (best human score) for THIS mode.
+      const yourPairs = Math.max(...players.filter(p => p.type === "human").map(p => p.score));
+      const shortMode = MODE_SHORT[modeKey] || modeKey;
+      if (yourPairs > loadBest(modeKey)) {
+        localStorage.setItem(BEST_PREFIX + modeKey, yourPairs);
+        statusEl.textContent = msg + " 🏆 New " + shortMode + " best: " + yourPairs + " pairs!";
       }
+      pushRecord("records-memory", { score: yourPairs, mode: shortMode, date: Date.now() });
+      showRecord();
     }
 
     function nextPlayer() { current = (current + 1) % players.length; }
