@@ -212,18 +212,12 @@
     body { padding-top: 68px; }
   </style>
   <nav class="topbar">
-    <a class="back" href="index.html" title="Back to menu">←</a>
-    <div class="tabs">
-      <a href="rock-paper-scissors.html">✊ RPS</a>
-      <a href="1-100.html">🔢 1–100</a>
-      <a href="hedgehog.html" class="active">🦔 Whack</a>
-      <a href="memory.html">🧠 Memory</a>
-      <a href="pacman.html">👾 Pac-Man</a>
-    </div>
+    <a class="back" href="index.html" title="Back to home">← Home</a>
   </nav>
   <h1>🔨 Whack-a-Hedgehog 🦔🐉</h1>
 
-  <div class="modes" id="modes"></div>
+  <div class="modes" id="time-modes"></div>
+  <div class="modes" id="speed-modes"></div>
 
   <div class="stats">
     <div class="stat">
@@ -280,16 +274,25 @@
   <script>
     const SIZE = 5;
     const HOLES = SIZE * SIZE;       // 25
-    // Speed modes — each STARTS the creatures at a different speed multiplier
-    // and keeps its own high score. (Speed still ramps up with your score.)
-    const MODES = {
+    // You pick BOTH a length (90/60/30s) and a starting speed (slow/fast/insane).
+    // Each time×speed combination keeps its own high score.
+    const TIMES = {
+      t90: { label: "90s", time: 90 },
+      t60: { label: "60s", time: 60 },
+      t30: { label: "30s", time: 30 },
+    };
+    const TIME_ORDER = ["t90", "t60", "t30"];
+    const SPEEDS = {
       slow:   { label: "🐢 Slow ×1",   startSpeed: 1 },
       fast:   { label: "🐇 Fast ×3",   startSpeed: 3 },
       insane: { label: "🔥 Insane ×5", startSpeed: 5 },
     };
-    const MODE_ORDER = ["slow", "fast", "insane"];
-    let modeKey = "slow";
-    const START_TIME = 60;                  // starting seconds (same for every mode)
+    const SPEED_ORDER = ["slow", "fast", "insane"];
+    let timeKey = "t60";
+    let speedKey = "slow";
+    let START_TIME = TIMES[timeKey].time;   // starting seconds (set by the time mode)
+    function comboKey() { return timeKey + "-" + speedKey; }
+    function comboLabel() { return TIMES[timeKey].time + "s ×" + SPEEDS[speedKey].startSpeed; }
     const HEDGEHOG_MS = 3000;        // a hedgehog stays up 3 seconds
     const DRAGON_MS = 5000;          // a dragon stays up 5 seconds
     const SPAWN_MS = 850;            // how often a hedgehog tries to pop up
@@ -304,7 +307,7 @@
     const BOMB_SPAWN_MS = 3000;      // base gap between bombs (divided by speed)
     const BOMB_POINTS_PENALTY = 10;  // hit a bomb → choose: lose 10 points…
     const BOMB_TIME_PENALTY = 10;    //                  …or lose 10 seconds
-    const HS_PREFIX = "hedgehog-highscore-";   // + modeKey → per-difficulty high score
+    const HS_PREFIX = "hedgehog-highscore-";   // + comboKey (time-speed) → high score
     // Sonic: rare moving bonus — hit it to GAIN 5 points or 5 seconds.
     const SONIC_MS = 5000;           // stays up 5 seconds
     const SONIC_MOVE_MS = 1000;      // moves 1 square every second
@@ -330,7 +333,7 @@
 
     // Animals get quicker as your score climbs: the mode sets the STARTING speed,
     // then +4% per point on top of that, capped at 10×.
-    function speedFactor() { return Math.min(10, MODES[modeKey].startSpeed + score * 0.04); }
+    function speedFactor() { return Math.min(10, SPEEDS[speedKey].startSpeed + score * 0.04); }
     function hedgehogUpMs() { return Math.max(450, Math.round(HEDGEHOG_MS / speedFactor())); }
     function dragonUpMs()   { return Math.max(1200, Math.round(DRAGON_MS / speedFactor())); }
     function hedgehogGapMs() { return Math.max(180, Math.round(SPAWN_MS / speedFactor())); }
@@ -350,7 +353,7 @@
     const choosePointsBtn = document.getElementById("choose-points");
     const chooseSecondsBtn = document.getElementById("choose-seconds");
 
-    function loadHigh() { return Number(localStorage.getItem(HS_PREFIX + modeKey)) || 0; }
+    function loadHigh() { return Number(localStorage.getItem(HS_PREFIX + comboKey())) || 0; }
     // Append a result to a shared leaderboard list (read by the menu page).
     function pushRecord(key, entry) {
       let a; try { a = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { a = []; }
@@ -719,13 +722,13 @@
       updateStats();
       const best = loadHigh();
       if (score > best) {
-        localStorage.setItem(HS_PREFIX + modeKey, score);
+        localStorage.setItem(HS_PREFIX + comboKey(), score);
         bestEl.textContent = score;
         statusEl.textContent = "⏰ Time's up! 🏆 New high score: " + score + " points!";
       } else {
         statusEl.textContent = "⏰ Time's up! Final score: " + score + " (best: " + best + ").";
       }
-      pushRecord("records-hedgehog", { score: score, mode: "×" + MODES[modeKey].startSpeed, date: Date.now() });
+      pushRecord("records-hedgehog", { score: score, mode: comboLabel(), date: Date.now() });
     }
 
     // --- hammer cursor ---
@@ -739,25 +742,44 @@
       setTimeout(() => hammerEl.classList.remove("whack"), 110);
     });
 
-    // --- difficulty mode buttons ---
-    const modesEl = document.getElementById("modes");
+    // --- mode buttons: pick a length AND a starting speed ---
+    const timeModesEl = document.getElementById("time-modes");
+    const speedModesEl = document.getElementById("speed-modes");
     function buildModeButtons() {
-      modesEl.innerHTML = "";
-      MODE_ORDER.forEach(key => {
+      timeModesEl.innerHTML = "";
+      TIME_ORDER.forEach(key => {
         const b = document.createElement("button");
-        b.className = "mode-btn" + (key === modeKey ? " active" : "");
-        b.textContent = MODES[key].label;
-        b.addEventListener("click", () => setMode(key));
-        modesEl.appendChild(b);
+        b.className = "mode-btn" + (key === timeKey ? " active" : "");
+        b.textContent = TIMES[key].label;
+        b.addEventListener("click", () => setTime(key));
+        timeModesEl.appendChild(b);
+      });
+      speedModesEl.innerHTML = "";
+      SPEED_ORDER.forEach(key => {
+        const b = document.createElement("button");
+        b.className = "mode-btn" + (key === speedKey ? " active" : "");
+        b.textContent = SPEEDS[key].label;
+        b.addEventListener("click", () => setSpeed(key));
+        speedModesEl.appendChild(b);
       });
     }
-    function setMode(key) {
-      if (running) return;   // finish the current game before switching
-      modeKey = key;
-      buildModeButtons();
-      bestEl.textContent = loadHigh();                       // this mode's own high score
+    function refreshPreview() {
+      bestEl.textContent = loadHigh();                                  // this combo's high score
       timeEl.textContent = formatTime(START_TIME);
-      speedEl.textContent = MODES[key].startSpeed.toFixed(1) + "×";  // preview starting speed
+      speedEl.textContent = SPEEDS[speedKey].startSpeed.toFixed(1) + "×";
+    }
+    function setTime(key) {
+      if (running) return;   // finish the current game before switching
+      timeKey = key;
+      START_TIME = TIMES[key].time;
+      buildModeButtons();
+      refreshPreview();
+    }
+    function setSpeed(key) {
+      if (running) return;
+      speedKey = key;
+      buildModeButtons();
+      refreshPreview();
     }
 
     boardEl.addEventListener("click", onBoardClick);
@@ -766,7 +788,8 @@
     chooseSecondsBtn.addEventListener("click", () => answerChoice("seconds"));
 
     buildBoard();
-    setMode(modeKey);   // builds mode buttons, shows this mode's best + starting speed
+    buildModeButtons();
+    refreshPreview();   // shows this combo's best + starting speed + time
   </script>
 </body>
 </html>
