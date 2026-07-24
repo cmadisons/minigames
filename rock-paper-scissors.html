@@ -137,7 +137,6 @@
     <a class="back" href="index.html" title="Back to home">← Home</a>
   </nav>
   <h1>Rock Paper Scissors</h1>
-  <p class="subtitle">Best of 5 — first to 3 wins takes the match!</p>
 
   <div class="scoreboard">
     <div class="score-box">
@@ -152,19 +151,23 @@
       <span class="label">Computer</span>
       <span class="value" id="computer-score">0</span>
     </div>
+    <div class="score-box">
+      <span class="label">Streak</span>
+      <span class="value" id="streak">0</span>
+    </div>
+    <div class="score-box">
+      <span class="label">Best</span>
+      <span class="value" id="best-streak">0</span>
+    </div>
   </div>
 
-  <div class="subtitle" style="margin-top:-12px;margin-bottom:20px;">
-    Win streak: <strong id="streak">0</strong> · 🏆 Best streak: <strong id="best-streak">0</strong>
-  </div>
+  <div class="result" id="result">Make your move!</div>
 
   <div class="arena">
     <div class="hand" id="player-hand">❓</div>
     <span class="vs">VS</span>
     <div class="hand" id="computer-hand">❓</div>
   </div>
-
-  <div class="result" id="result">Make your move!</div>
 
   <div class="choices">
     <button class="choice-btn" data-choice="rock" title="Rock">✊</button>
@@ -173,6 +176,8 @@
   </div>
 
   <button class="reset-btn" id="reset">New Match</button>
+
+  <p class="subtitle">Best of 5 — first to 3 wins takes the match!</p>
 
   <script>
     const EMOJI = { rock: "✊", paper: "✋", scissors: "✌️" };

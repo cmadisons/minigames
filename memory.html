@@ -137,7 +137,6 @@
     <a class="back" href="index.html" title="Back to home">← Home</a>
   </nav>
   <h1>🃏 Memory Match</h1>
-  <p class="subtitle">Flip cards to find matching pairs — collect more than the computer!</p>
 
   <div class="modes" id="modes"></div>
 
@@ -145,11 +144,11 @@
 
   <div class="status" id="status"></div>
 
-  <div class="status" id="record" style="min-height:1rem;font-size:0.9rem;color:#ffd23f;margin-top:-8px;"></div>
-
   <div class="board" id="board"></div>
 
   <button class="reset-btn" id="reset">Restart This Mode</button>
+
+  <p class="subtitle">Flip cards to find matching pairs — collect more than the computer!</p>
 
   <script>
     const ROWS = 5, COLS = 6;          // 5 × 6 = 30 cards
@@ -197,15 +196,14 @@
     const statusEl = document.getElementById("status");
     const modesEl = document.getElementById("modes");
     const scoreboardEl = document.getElementById("scoreboard");
-    const recordEl = document.getElementById("record");
 
     // High score (per mode) = the most pairs you've ever collected in that mode.
     const BEST_PREFIX = "memory-best-";     // + modeKey → best pairs collected
     const MODE_SHORT = { easy: "Easy", mid: "Mid", hard: "Hard", perfect: "Perfect", two: "2P", three: "3P" };
     function loadBest(key) { return Number(localStorage.getItem(BEST_PREFIX + key)) || 0; }
     function showRecord() {
-      recordEl.textContent =
-        "🏆 " + (MODE_SHORT[modeKey] || modeKey) + " best: " + loadBest(modeKey) + " pairs";
+      const el = document.getElementById("mem-best-value");
+      if (el) el.textContent = loadBest(modeKey);
     }
     // Append a result to a shared leaderboard list (read by the menu page).
     function pushRecord(key, entry) {
@@ -299,6 +297,12 @@
           '<div class="value" id="score-' + idx + '">0</div>';
         scoreboardEl.appendChild(box);
       });
+      // Best (this mode's high score) sits in the same row, in gold.
+      const best = document.createElement("div");
+      best.className = "score-box best-box";
+      best.innerHTML = '<div class="label">🏆 Best</div><div class="value" id="mem-best-value">0</div>';
+      scoreboardEl.appendChild(best);
+      showRecord();
     }
     function updateUI() {
       players.forEach((p, idx) => {
