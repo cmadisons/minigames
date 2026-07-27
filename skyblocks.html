@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sky Blocks</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --card: #16213e;
+      --accent: #e94560;
+      --text: #eaeaea;
+      --muted: #8890a6;
+      --gold: #ffd23f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 12px 12px 40px;
+      text-align: center;
+    }
+
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 52px;
+      display: flex; align-items: center; gap: 12px; padding: 0 12px;
+      background: rgba(22,33,62,0.95); backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 1000;
+    }
+    .topbar .back {
+      text-decoration: none; color: var(--text); font-size: 1.2rem; line-height: 1;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 7px 13px;
+    }
+    .topbar .back:hover { border-color: var(--accent); }
+    body { padding-top: 62px; }
+
+    h1 { font-size: 1.6rem; margin-bottom: 4px; }
+    .subtitle { color: var(--muted); font-size: 0.92rem; margin-bottom: 14px; }
+
+    .stats { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 10px; }
+    .stat {
+      padding: 8px 16px; border-radius: 11px; background: var(--card); min-width: 84px;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .stat .label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 700; }
+    .stat .value { font-size: 1.35rem; font-weight: bold; line-height: 1.1; }
+    #score-value { color: var(--gold); }
+
+    .status { min-height: 1.3rem; font-weight: 600; color: var(--gold); margin: 6px 0 10px; font-size: 0.95rem; }
+
+    /* ---- the island ---- */
+    #world {
+      display: grid;
+      width: 100%; max-width: 620px;
+      background: linear-gradient(180deg, #4a7fd4 0%, #77b3ee 55%, #a8d4f5 100%);
+      border-radius: 12px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.12);
+      touch-action: manipulation;
+    }
+    .cell {
+      aspect-ratio: 1 / 1;
+      display: flex; align-items: center; justify-content: center;
+      font-size: min(2.6vw, 15px); line-height: 1;
+      cursor: pointer;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      position: relative;
+    }
+    .cell:hover::after {
+      content: ""; position: absolute; inset: 0;
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.75);
+    }
+    .b-air     { background: transparent; }
+    .b-grass   { background: #5aa83c; box-shadow: inset 0 -4px 0 #7a5230, inset 0 0 0 1px rgba(0,0,0,.16); }
+    .b-dirt    { background: #7a5230; box-shadow: inset 0 0 0 1px rgba(0,0,0,.16); }
+    .b-stone   { background: #8d8d95; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
+    .b-cobble  { background: #6f6f78; box-shadow: inset 0 0 0 1px rgba(0,0,0,.22), inset 2px 2px 0 rgba(255,255,255,.10); }
+    .b-log     { background: #6b4423; box-shadow: inset 0 0 0 1px rgba(0,0,0,.2), inset 3px 0 0 rgba(255,255,255,.08); }
+    .b-leaves  { background: #3f8f2f; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
+    .b-sand    { background: #ddcC8a; box-shadow: inset 0 0 0 1px rgba(0,0,0,.14); }
+    .b-water   { background: #2f7fe0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
+    .b-lava    { background: #e05a1a; box-shadow: inset 0 0 0 1px rgba(255,220,0,.35); animation: glow 1.6s ease-in-out infinite; }
+    .b-sapling { background: transparent; }
+    @keyframes glow { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+
+    /* ---- hotbar ---- */
+    .hotbar {
+      display: flex; gap: 7px; flex-wrap: wrap; justify-content: center;
+      margin-top: 14px; width: 100%; max-width: 620px;
+    }
+    .slot {
+      position: relative; width: 58px; height: 58px; border-radius: 10px;
+      background: var(--card); border: 2px solid transparent;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; cursor: pointer; color: var(--text); font-size: 1.35rem;
+    }
+    .slot:hover { border-color: rgba(255,255,255,0.25); }
+    .slot.active { border-color: var(--accent); background: #24304f; }
+    .slot .swatch { width: 24px; height: 24px; border-radius: 5px; }
+    .slot .count {
+      position: absolute; bottom: 3px; right: 5px;
+      font-size: 0.68rem; font-weight: 700; color: var(--gold);
+      text-shadow: 0 1px 2px #000;
+    }
+    .slot.empty { opacity: 0.34; }
+
+    /* ---- goals ---- */
+    .goals { width: 100%; max-width: 620px; margin-top: 22px; text-align: left; }
+    .goals h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+    .goals li {
+      list-style: none; display: flex; align-items: center; gap: 9px;
+      padding: 7px 13px; margin-bottom: 5px; border-radius: 9px;
+      background: var(--card); font-size: 0.88rem; color: #cfd3e0;
+    }
+    .goals li.done { background: #1d3326; color: #9fe3a8; }
+    .goals li .tick { flex: none; width: 1.2rem; }
+    .goals li .pts { margin-left: auto; color: var(--muted); font-size: 0.78rem; }
+
+    .btn {
+      margin-top: 14px; padding: 10px 22px; font-size: 0.98rem;
+      color: #fff; background: var(--accent); border: none; border-radius: 10px; cursor: pointer;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn.ghost {
+      background: transparent; border: 1px solid #2a3a5e; color: var(--muted); font-size: 0.85rem; padding: 8px 16px;
+    }
+    .btn.ghost:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
+    .buttons { display: flex; gap: 9px; flex-wrap: wrap; justify-content: center; }
+
+    .hint {
+      color: var(--muted); font-size: 0.83rem; margin-top: 16px;
+      max-width: 620px; line-height: 1.6;
+    }
+    .hint b { color: #cfd3e0; }
+  </style>
+</head>
+<body>
+  <nav class="topbar">
+    <a class="back" href="index.html" title="Back to all minigames">← Home</a>
+  </nav>
+
+  <h1>🏝️ Sky Blocks</h1>
+  <p class="subtitle">You start on a tiny floating island. Build it into something bigger.</p>
+
+  <div class="stats">
+    <div class="stat"><div class="label">Score</div><div class="value" id="score-value">0</div></div>
+    <div class="stat"><div class="label">Placed</div><div class="value" id="placed-value">0</div></div>
+    <div class="stat"><div class="label">Mined</div><div class="value" id="mined-value">0</div></div>
+    <div class="stat"><div class="label">Goals</div><div class="value" id="goals-value">0/6</div></div>
+  </div>
+
+  <div class="status" id="status">Tap a block to mine it. Tap the sky to build.</div>
+
+  <div id="world"></div>
+
+  <div class="hotbar" id="hotbar"></div>
+
+  <div class="buttons">
+    <button class="btn" id="bank">🏁 Save score</button>
+    <button class="btn ghost" id="reset">Start a new island</button>
+  </div>
+
+  <section class="goals">
+    <h2>📜 Goals</h2>
+    <ul id="goal-list"></ul>
+  </section>
+
+  <p class="hint">
+    <b>Mine:</b> tap any block and it goes into your bag.
+    <b>Build:</b> pick a block from the bag, then tap empty sky next to something solid.<br>
+    💧 <b>Water</b> and 🔥 <b>lava</b> can be picked back up if you put them in the wrong spot.
+    Leave <b>one empty square between them</b> and it fills with cobblestone — over and over, forever.
+    That's how you get unlimited blocks.
+  </p>
+
+  <script>
+  (function () {
+    "use strict";
+
+    // ---------- world model ----------
+    const COLS = 26, ROWS = 17;
+    const AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, COBBLE = 4,
+          LOG = 5, LEAVES = 6, SAND = 7, WATER = 8, LAVA = 9, SAPLING = 10;
+
+    const BLOCKS = {
+      [GRASS]:   { key: "grass",   name: "Grass",       emoji: "",   color: "#5aa83c" },
+      [DIRT]:    { key: "dirt",    name: "Dirt",        emoji: "",   color: "#7a5230" },
+      [STONE]:   { key: "stone",   name: "Stone",       emoji: "",   color: "#8d8d95" },
+      [COBBLE]:  { key: "cobble",  name: "Cobblestone", emoji: "",   color: "#6f6f78" },
+      [LOG]:     { key: "log",     name: "Wood",        emoji: "",   color: "#6b4423" },
+      [LEAVES]:  { key: "leaves",  name: "Leaves",      emoji: "",   color: "#3f8f2f" },
+      [SAND]:    { key: "sand",    name: "Sand",        emoji: "",   color: "#ddcc8a" },
+      [WATER]:   { key: "water",   name: "Water",       emoji: "💧", color: "#2f7fe0" },
+      [LAVA]:    { key: "lava",    name: "Lava",        emoji: "🔥", color: "#e05a1a" },
+      [SAPLING]: { key: "sapling", name: "Sapling",     emoji: "🌱", color: "#3f8f2f" },
+    };
+    const SOLID = new Set([GRASS, DIRT, STONE, COBBLE, LOG, LEAVES, SAND]);
+    // What each block gives you when mined (usually itself).
+    const DROPS = { [GRASS]: DIRT };
+    const PLACEABLE = [DIRT, COBBLE, STONE, SAND, LOG, LEAVES, SAPLING, WATER, LAVA];
+
+    const SAVE_KEY = "skyblocks-save";
+    const RECORD_KEY = "records-skyblocks";
+
+    let grid, bag, selected, score, placed, mined, goalsDone, saplings;
+
+    // ---------- goals ----------
+    const GOALS = [
+      { id: "mine",    text: "Mine your first block",                  pts: 10,  test: s => s.mined >= 1 },
+      { id: "gen",     text: "Build a cobblestone generator",          pts: 60,  test: s => s.cobbleMade >= 1 },
+      { id: "cobble",  text: "Collect 40 cobblestone",                 pts: 80,  test: s => s.cobbleHeld >= 40 },
+      { id: "tree",    text: "Grow a brand new tree",                  pts: 70,  test: s => s.treesGrown >= 1 },
+      { id: "big",     text: "Grow the island to 120 blocks",          pts: 120, test: s => s.solidCount >= 120 },
+      { id: "sky",     text: "Build all the way to the top of the sky", pts: 150, test: s => s.topReached },
+    ];
+    let counters = { cobbleMade: 0, treesGrown: 0, topReached: false };
+
+    // ---------- elements ----------
+    const worldEl  = document.getElementById("world");
+    const hotbarEl = document.getElementById("hotbar");
+    const statusEl = document.getElementById("status");
+    const scoreEl  = document.getElementById("score-value");
+    const placedEl = document.getElementById("placed-value");
+    const minedEl  = document.getElementById("mined-value");
+    const goalsEl  = document.getElementById("goals-value");
+    const goalList = document.getElementById("goal-list");
+
+    const idx = (r, c) => r * COLS + c;
+    const inBounds = (r, c) => r >= 0 && r < ROWS && c >= 0 && c < COLS;
+    const at = (r, c) => (inBounds(r, c) ? grid[idx(r, c)] : AIR);
+
+    function neighbours(r, c) {
+      return [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]];
+    }
+
+    // ---------- setup ----------
+    function freshWorld() {
+      grid = new Array(COLS * ROWS).fill(AIR);
+      const baseRow = 11, left = 10;
+      // a 6-wide, 3-deep starter island
+      for (let c = left; c < left + 6; c++) {
+        grid[idx(baseRow, c)] = GRASS;
+        grid[idx(baseRow + 1, c)] = DIRT;
+        grid[idx(baseRow + 2, c)] = STONE;
+      }
+      // one starter tree on the left of the island
+      const tc = left + 1;
+      for (let r = baseRow - 1; r >= baseRow - 3; r--) grid[idx(r, tc)] = LOG;
+      const top = baseRow - 4;
+      for (let c = tc - 1; c <= tc + 1; c++) {
+        grid[idx(top, c)] = LEAVES;
+        grid[idx(top + 1, c)] = LEAVES;
+      }
+      grid[idx(top + 1, tc)] = LOG;
+
+      bag = {};
+      bag[WATER] = 1;
+      bag[LAVA] = 1;
+      bag[DIRT] = 3;
+
+      selected = null;
+      score = 0; placed = 0; mined = 0;
+      goalsDone = {};
+      saplings = {};
+      counters = { cobbleMade: 0, treesGrown: 0, topReached: false };
+    }
+
+    function save() {
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify({
+          grid, bag, score, placed, mined, goalsDone, saplings, counters,
+        }));
+      } catch (e) { /* storage full or blocked — game still plays */ }
+    }
+    function load() {
+      let d;
+      try { d = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { d = null; }
+      if (!d || !Array.isArray(d.grid) || d.grid.length !== COLS * ROWS) return false;
+      grid = d.grid;
+      bag = d.bag || {};
+      score = d.score || 0;
+      placed = d.placed || 0;
+      mined = d.mined || 0;
+      goalsDone = d.goalsDone || {};
+      saplings = d.saplings || {};
+      counters = Object.assign({ cobbleMade: 0, treesGrown: 0, topReached: false }, d.counters || {});
+      selected = null;
+      return true;
+    }
+
+    // ---------- rendering ----------
+    let cells = [];
+    function buildDom() {
+      worldEl.style.gridTemplateColumns = "repeat(" + COLS + ", 1fr)";
+      worldEl.innerHTML = "";
+      cells = [];
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const b = document.createElement("button");
+          b.className = "cell b-air";
+          b.dataset.r = r; b.dataset.c = c;
+          b.setAttribute("aria-label", "row " + (r + 1) + " column " + (c + 1));
+          worldEl.appendChild(b);
+          cells.push(b);
+        }
+      }
+    }
+
+    function paint() {
+      for (let i = 0; i < grid.length; i++) {
+        const t = grid[i];
+        const info = BLOCKS[t];
+        const cls = "cell b-" + (info ? info.key : "air");
+        if (cells[i].className !== cls) cells[i].className = cls;
+        const em = info ? info.emoji : "";
+        if (cells[i].textContent !== em) cells[i].textContent = em;
+      }
+    }
+
+    function countSolid() {
+      let n = 0;
+      for (const t of grid) if (SOLID.has(t)) n++;
+      return n;
+    }
+
+    function renderStats() {
+      scoreEl.textContent = score;
+      placedEl.textContent = placed;
+      minedEl.textContent = mined;
+      const done = GOALS.filter(g => goalsDone[g.id]).length;
+      goalsEl.textContent = done + "/" + GOALS.length;
+    }
+
+    function renderHotbar() {
+      hotbarEl.innerHTML = "";
+      for (const t of PLACEABLE) {
+        const n = bag[t] || 0;
+        const info = BLOCKS[t];
+        const b = document.createElement("button");
+        b.className = "slot" + (selected === t ? " active" : "") + (n ? "" : " empty");
+        b.title = info.name + " ×" + n;
+        b.innerHTML =
+          '<span class="swatch" style="background:' + info.color + '"></span>' +
+          (info.emoji ? '<span style="position:absolute;font-size:1.05rem;top:14px">' + info.emoji + "</span>" : "") +
+          '<span class="count">' + n + "</span>";
+        b.addEventListener("click", () => {
+          if (!(bag[t] > 0)) { setStatus("You have no " + info.name.toLowerCase() + " yet."); return; }
+          selected = (selected === t) ? null : t;
+          renderHotbar();
+          if (selected) setStatus("Holding " + info.name + " — tap the sky to place it.");
+        });
+        hotbarEl.appendChild(b);
+      }
+    }
+
+    function renderGoals() {
+      goalList.innerHTML = GOALS.map(g =>
+        '<li class="' + (goalsDone[g.id] ? "done" : "") + '">' +
+          '<span class="tick">' + (goalsDone[g.id] ? "✅" : "⬜") + "</span>" +
+          "<span>" + g.text + "</span>" +
+          '<span class="pts">+' + g.pts + "</span>" +
+        "</li>"
+      ).join("");
+    }
+
+    function setStatus(msg) { statusEl.textContent = msg; }
+
+    // ---------- goal checking ----------
+    function checkGoals() {
+      const state = {
+        mined: mined,
+        cobbleMade: counters.cobbleMade,
+        cobbleHeld: bag[COBBLE] || 0,
+        treesGrown: counters.treesGrown,
+        solidCount: countSolid(),
+        topReached: counters.topReached,
+      };
+      for (const g of GOALS) {
+        if (!goalsDone[g.id] && g.test(state)) {
+          goalsDone[g.id] = true;
+          score += g.pts;
+          setStatus("🎉 Goal complete: " + g.text + "  (+" + g.pts + ")");
+        }
+      }
+      renderGoals();
+    }
+
+    // ---------- actions ----------
+    function give(t, n) { bag[t] = (bag[t] || 0) + n; }
+
+    function mine(r, c) {
+      const t = at(r, c);
+      if (t === AIR) return false;
+      grid[idx(r, c)] = AIR;
+      delete saplings[idx(r, c)];
+      const drop = (DROPS[t] !== undefined) ? DROPS[t] : t;
+      give(drop, 1);
+      mined++;
+      score += 1;
+      // leaves occasionally give a sapling so you can plant more trees
+      if (t === LEAVES && Math.random() < 0.28) {
+        give(SAPLING, 1);
+        setStatus("🌱 A sapling dropped from the leaves!");
+      }
+      return true;
+    }
+
+    function canPlaceAt(r, c) {
+      if (at(r, c) !== AIR) return false;
+      // must touch something already there, so the island stays connected
+      return neighbours(r, c).some(([nr, nc]) => at(nr, nc) !== AIR);
+    }
+
+    function place(r, c) {
+      if (selected === null) { setStatus("Pick a block from your bag first."); return false; }
+      if (!(bag[selected] > 0)) { setStatus("You've run out of that block."); return false; }
+      if (!canPlaceAt(r, c)) { setStatus("Blocks have to touch the island."); return false; }
+      const t = selected;
+      if (t === SAPLING) {
+        const below = at(r + 1, c);
+        if (below !== GRASS && below !== DIRT) { setStatus("Saplings need grass or dirt underneath."); return false; }
+        saplings[idx(r, c)] = 14;   // ticks until it grows
+      }
+      grid[idx(r, c)] = t;
+      bag[t]--;
+      if (bag[t] <= 0) { delete bag[t]; selected = null; }
+      placed++;
+      score += 2;
+      if (r === 0) counters.topReached = true;
+      return true;
+    }
+
+    function onCell(r, c) {
+      const t = at(r, c);
+      const acted = (t === AIR) ? place(r, c) : mine(r, c);
+      if (acted) { paint(); renderHotbar(); renderStats(); checkGoals(); save(); }
+    }
+
+    worldEl.addEventListener("click", e => {
+      const cell = e.target.closest(".cell");
+      if (!cell) return;
+      onCell(Number(cell.dataset.r), Number(cell.dataset.c));
+    });
+
+    // ---------- world tick: cobble generator + tree growth ----------
+    function growTree(r, c) {
+      const h = 2 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < h; i++) if (inBounds(r - i, c)) grid[idx(r - i, c)] = LOG;
+      const top = r - h;
+      for (let dr = 0; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          const rr = top + dr, cc = c + dc;
+          if (inBounds(rr, cc) && grid[idx(rr, cc)] === AIR) grid[idx(rr, cc)] = LEAVES;
+        }
+      }
+      if (inBounds(top + 1, c)) grid[idx(top + 1, c)] = LOG;
+      counters.treesGrown++;
+    }
+
+    function tick() {
+      let changed = false;
+
+      // Cobblestone generator: an empty square touching both water and lava
+      // turns to cobblestone. Mine it and it fills in again — infinite blocks.
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (grid[idx(r, c)] !== AIR) continue;
+          let water = false, lava = false;
+          for (const [nr, nc] of neighbours(r, c)) {
+            const n = at(nr, nc);
+            if (n === WATER) water = true;
+            else if (n === LAVA) lava = true;
+          }
+          if (water && lava) {
+            grid[idx(r, c)] = COBBLE;
+            counters.cobbleMade++;
+            changed = true;
+          }
+        }
+      }
+
+      // Saplings grow after a while.
+      for (const key of Object.keys(saplings)) {
+        const i = Number(key);
+        if (grid[i] !== SAPLING) { delete saplings[key]; continue; }
+        saplings[key]--;
+        if (saplings[key] <= 0) {
+          delete saplings[key];
+          growTree(Math.floor(i / COLS), i % COLS);
+          changed = true;
+          setStatus("🌳 Your sapling grew into a tree!");
+        }
+      }
+
+      if (changed) { paint(); renderStats(); checkGoals(); save(); }
+    }
+
+    // ---------- buttons ----------
+    document.getElementById("bank").addEventListener("click", () => {
+      let list;
+      try { list = JSON.parse(localStorage.getItem(RECORD_KEY)) || []; } catch (e) { list = []; }
+      list.push({ score: score, date: Date.now(), mode: countSolid() + " blocks" });
+      if (list.length > 50) list = list.slice(-50);
+      localStorage.setItem(RECORD_KEY, JSON.stringify(list));
+      setStatus("🏁 Saved " + score + " to the leaderboard on the home page!");
+    });
+
+    document.getElementById("reset").addEventListener("click", () => {
+      if (!confirm("Start over with a brand new island? Your build will be lost.")) return;
+      freshWorld();
+      paint(); renderHotbar(); renderStats(); renderGoals();
+      save();
+      setStatus("A fresh island. Tap a block to mine it.");
+    });
+
+    // ---------- go ----------
+    buildDom();
+    if (!load()) freshWorld();
+    paint(); renderHotbar(); renderStats(); renderGoals();
+    setInterval(tick, 700);
+  })();
+  </script>
+</body>
+</html>

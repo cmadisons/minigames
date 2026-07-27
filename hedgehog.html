@@ -1,796 +1,1329 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Whack-a-Hedgehog</title>
-  <style>
-    :root {
-      --bg: #1a1a2e;
-      --hole: #3d2b1f;
-      --hole-rim: #5a4030;
-      --grass: #2e7d32;
-      --text: #eaeaea;
-      --accent: #e94560;
-      --bonus: #2ecc71;
-      --points: #f1c40f;
-      --penalty: #e74c3c;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
-      text-align: center;
-    }
-    h1 { margin: 4px 0 8px; font-size: 1.6rem; }
-    .subtitle { color: #9aa0b5; font-size: 0.95rem; margin-bottom: 18px; line-height: 1.5; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whack-a-Hedgehog</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: "Trebuchet MS", system-ui, sans-serif;
+    background: radial-gradient(circle at 50% 20%, #8fd96b, #4a8b2f 70%, #36681f);
+    overflow: hidden; cursor: none; user-select: none; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
 
-    .stats {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .stat {
-      padding: 10px 18px; border-radius: 12px; background: #16213e; min-width: 92px;
-      display: flex; flex-direction: column; align-items: center; gap: 2px;
-    }
-    .stat .label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1px; color: #8890a6; font-weight: 600; }
-    .stat .value { font-size: 1.7rem; font-weight: bold; line-height: 1.1; }
-    #time-value.low { color: var(--penalty); }
-    #score-value { color: var(--points); }
-    #best-value { color: #ffd23f; }
+  #hud { display: flex; gap: 12px; align-items: center; font-size: 21px; font-weight: bold;
+    color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.35); }
+  #hud .pill { background: rgba(0,0,0,.28); padding: 7px 13px; border-radius: 30px;
+    min-width: 92px; text-align: center; transition: background .2s, color .2s; }
+  #timer.low { color: #ffd24a; animation: pulse .6s infinite; }
+  #timerPill.frozen { background: rgba(70,150,255,.55); color: #eaf4ff; }
+  #speedPill { color: #ffd24a; }
+  @keyframes pulse { 50% { transform: scale(1.12); } }
 
-    .modes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 12px; }
-    .mode-btn {
-      font-size: 0.85rem; padding: 8px 16px; border: 1px solid #33415e; border-radius: 999px;
-      background: #16213e; color: var(--text); cursor: pointer; transition: border-color .12s, background .12s, color .12s;
-    }
-    .mode-btn:hover { border-color: var(--accent); }
-    .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .float { position: fixed; pointer-events: none; font-size: 27px; font-weight: bold;
+    text-shadow: 0 2px 4px rgba(0,0,0,.4); animation: floatUp 1s ease-out forwards; z-index: 50; white-space: nowrap; }
+  .float.good { color: #b6ff6a; } .float.gold { color: #ffd24a; }
+  .float.bad { color: #ff6a6a; } .float.frost { color: #9ad4ff; }
+  @keyframes floatUp { from { transform: translate(-50%,0); opacity: 1; } to { transform: translate(-50%,-70px); opacity: 0; } }
 
-    .misses { display: flex; gap: 6px; align-items: center; }
-    .miss-dot {
-      width: 16px; height: 16px; border-radius: 50%;
-      border: 2px solid #666; background: transparent;
-    }
-    .miss-dot.on { background: var(--penalty); border-color: var(--penalty); }
+  #grid { display: grid; gap: 14px; padding: 20px; background: rgba(60,40,20,.25); border-radius: 20px; }
+  .hole { width: 92px; height: 100px; position: relative; cursor: none; overflow: hidden; }
+  .hole::after { content: ""; position: absolute; left: 50%; bottom: 2px; width: 84px; height: 28px;
+    background: radial-gradient(ellipse at center, #3a2412 0%, #5a3a1c 70%, #6b4423 100%);
+    border-radius: 50%; transform: translateX(-50%); box-shadow: inset 0 5px 7px rgba(0,0,0,.6); z-index: 3; pointer-events: none; }
+  .hole.rock { overflow: visible; }
+  .hole.rock::after { display: none; }
+  .hole.rock .rockface { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 56px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+  .critter { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(165%);
+    transition: transform .18s cubic-bezier(.34,1.56,.64,1); z-index: 2; will-change: transform; line-height: 1; }
+  .hole.up .critter { transform: translateX(-50%) translateY(0); }
+  .hole.bonked .critter { transform: translateX(-50%) translateY(40%) scale(.7) rotate(10deg) !important;
+    filter: brightness(1.5) saturate(.4); transition: transform .12s ease; }
+  .hog { font-size: 56px; } .bomb { font-size: 52px; } .key { font-size: 50px; position: relative; }
+  .key.krare    { filter: sepia(1) saturate(5) hue-rotate(65deg) brightness(1.05) drop-shadow(0 0 5px rgba(90,220,90,.85)); }
+  .key.kgold    { filter: sepia(1) saturate(7) hue-rotate(-12deg) brightness(1.12) drop-shadow(0 0 6px rgba(255,200,60,.9)); }
+  .key.kdiamond { filter: sepia(1) saturate(6) hue-rotate(150deg) brightness(1.2) drop-shadow(0 0 7px rgba(90,220,255,.95)); }
+  .key.kemerald { filter: sepia(1) saturate(9) hue-rotate(85deg) brightness(1.1) drop-shadow(0 0 10px rgba(0,235,120,1)); }
+  .key .x3 { position: absolute; top: -8px; right: -12px; font-size: 21px; font-weight: bold; color: #fff;
+    -webkit-text-stroke: 2px #d02b2b; paint-order: stroke; filter: none; }
+  .key .kgem { position: absolute; bottom: -6px; left: -12px; font-size: 24px; filter: none; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+  #wonBadge { position: fixed; top: 8px; left: 12px; z-index: 101; font-weight: bold; font-size: 18px; color: #063; cursor: none;
+    background: linear-gradient(#9dffbf,#28d67a); padding: 5px 12px; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,180,90,.5); }
+  #winBanner { background: linear-gradient(135deg,#0a3d24,#1f8f56); border: 2px solid #57e39a;
+    border-radius: 16px; padding: 12px 16px; margin: 0 auto 14px; max-width: 560px; box-shadow: 0 0 24px rgba(60,230,140,.6); }
+  #winBanner h3 { color: #b6ffd6; font-size: 22px; margin-bottom: 4px; }
+  #winBanner .cert { font-size: 13px; opacity: .95; line-height: 1.5; }
+  #winBanner .perks { font-size: 15px; margin-top: 6px; }
+  .sonic { font-size: 54px; filter: sepia(1) saturate(7) hue-rotate(172deg) brightness(1.08) drop-shadow(0 0 6px rgba(60,150,255,.8)); }
+  .dhead { font-size: 48px; filter: sepia(1) saturate(9) hue-rotate(-8deg) brightness(1.12) drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
+  .hole.dragonhole { border-radius: 14px; box-shadow: 0 0 0 3px #ffd24a, 0 0 16px 5px rgba(255,210,74,.7); animation: dpulse .8s ease-in-out infinite; }
+  @keyframes dpulse { 50% { box-shadow: 0 0 0 4px #fff0b0, 0 0 24px 9px rgba(255,210,74,.95); } }
+  .hole.sonichole { border-radius: 14px; box-shadow: 0 0 0 3px #5ab0ff, 0 0 16px 5px rgba(80,160,255,.7); animation: spulse .55s ease-in-out infinite; }
+  @keyframes spulse { 50% { box-shadow: 0 0 0 4px #bfe0ff, 0 0 24px 9px rgba(80,160,255,.95); } }
+  .hole.keyhole { border-radius: 14px; box-shadow: 0 0 0 3px #ffe06a, 0 0 18px 6px rgba(255,224,106,.85); animation: dpulse .5s ease-in-out infinite; }
 
-    .status { min-height: 1.5rem; font-weight: bold; margin: 6px 0 12px; }
+  #grid.big { gap: 7px; padding: 14px; }
+  #grid.big .hole { width: 56px; height: 60px; }
+  #grid.big .hole::after { width: 50px; height: 17px; bottom: 1px; }
+  #grid.big .critter { bottom: 16px; }
+  #grid.big .hog, #grid.big .sonic { font-size: 34px; }
 
-    .board {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 12px;
-      max-width: 520px;
-      width: 100%;
-      cursor: none;            /* the hammer replaces the cursor */
-      touch-action: manipulation;
-    }
-    .hole {
-      position: relative;
-      aspect-ratio: 1 / 1;
-      background: radial-gradient(ellipse at 50% 38%, var(--hole) 60%, var(--hole-rim) 62%, var(--grass) 64%);
-      border-radius: 50%;
-      overflow: hidden;
-      user-select: none;
-    }
-    .creature {
-      position: absolute;
-      left: 0; right: 0; bottom: 6%;
-      font-size: clamp(1.8rem, 8vw, 2.8rem);
-      transform: translateY(120%);
-      transition: transform 0.18s ease-out;
-      pointer-events: none;     /* clicks register on the hole */
-    }
-    .hole.up .creature { transform: translateY(0); }
-    .hole.bonk .creature { transform: translateY(0) scale(0.7); }
-    /* yellow dragon: gold tint on the emoji + yellow rim */
-    .hole.dragon { box-shadow: inset 0 0 0 3px var(--points); }
-    .hole.dragon .creature { filter: sepia(1) saturate(6) hue-rotate(2deg) brightness(1.1); }
-    .hole.bomb { box-shadow: inset 0 0 0 3px #555; }
-    /* Sonic: a fast blue hedgehog */
-    .hole.sonic { box-shadow: inset 0 0 0 3px #3aa9ff, 0 0 14px #3aa9ff; }
-    .hole.sonic .creature svg {
-      width: clamp(2.4rem, 11vw, 3.6rem);
-      height: clamp(2.4rem, 11vw, 3.6rem);
-      margin: 0 auto;
-    }
+  /* boss = giant moving eye with hearts */
+  #boss { position: fixed; top: -9999px; left: -9999px; text-align: center; z-index: 95;
+    pointer-events: auto; cursor: none; transition: left .9s ease-in-out, top .9s ease-in-out; }
+  #boss .bossface { font-size: 88px; display: block; filter: drop-shadow(0 4px 8px rgba(0,0,0,.55)); animation: bossPulse .9s ease-in-out infinite; }
+  #boss .bosshp { font-size: 15px; letter-spacing: -1px; margin-top: -6px; }
+  @keyframes bossPulse { 50% { transform: scale(1.1); } }
+  #boss.bclosed .bossface { filter: grayscale(.6) brightness(.75) drop-shadow(0 4px 8px rgba(0,0,0,.55)); animation: none; }
+  .bossmini { position: fixed; top: -9999px; left: -9999px; text-align: center; z-index: 95; pointer-events: auto; cursor: none; transition: left .9s ease-in-out, top .9s ease-in-out; }
+  .bossmini .bossface { font-size: 72px; display: block; filter: drop-shadow(0 4px 8px rgba(0,0,0,.55)); animation: bossPulse .9s ease-in-out infinite; }
+  .bossmini .bosshp { font-size: 13px; letter-spacing: -1px; margin-top: -6px; }
+  .bossmini.bclosed .bossface { filter: grayscale(.6) brightness(.75) drop-shadow(0 4px 8px rgba(0,0,0,.55)); animation: none; }
+  .bossmini.bomblid.bclosed .bossface { filter: drop-shadow(0 0 9px #ff3b3b) drop-shadow(0 2px 4px rgba(0,0,0,.6)); animation: bossPulse .5s ease-in-out infinite; }
+  #quitBtn { position: fixed; top: 8px; right: 132px; z-index: 101; cursor: none; font: bold 15px "Trebuchet MS", sans-serif;
+    background: rgba(200,45,45,.9); color: #fff; border: none; border-radius: 18px; padding: 6px 14px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  #resetBtn { cursor: none; font: bold 14px "Trebuchet MS", sans-serif; margin-top: 12px; padding: 7px 16px; border: none; border-radius: 16px;
+    background: rgba(160,40,40,.6); color: #ffd; box-shadow: 0 2px 4px rgba(0,0,0,.3); }
+  #bigCount { position: fixed; top: 46%; left: 50%; transform: translate(-50%,-50%); z-index: 250; pointer-events: none;
+    font-weight: 900; font-size: 210px; color: #ff5a6a; -webkit-text-stroke: 4px #fff; paint-order: stroke;
+    text-shadow: 0 6px 22px rgba(0,0,0,.55), 0 0 34px rgba(255,90,90,.75); }
+  #roundKeys { position: fixed; left: 12px; bottom: 10px; z-index: 101; font-weight: bold; font-size: 17px; cursor: none;
+    background: rgba(0,0,0,.42); color: #ffe06a; padding: 6px 13px; border-radius: 16px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  #keyTotals { position: fixed; right: 12px; bottom: 10px; z-index: 101; font-weight: bold; font-size: 16px; cursor: none;
+    background: rgba(0,0,0,.42); color: #cfe9ff; padding: 6px 13px; border-radius: 16px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  .powrow.wyrrow { flex-wrap: wrap; gap: 6px; }
+  .wyrbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .wyrbtns button { font-size: 12px !important; padding: 5px 9px !important; }
+  #bigCount.pop { animation: countPop .85s ease-out; }
+  @keyframes countPop { 0% { transform: translate(-50%,-50%) scale(.2); opacity: 0; } 18% { transform: translate(-50%,-50%) scale(1.35); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(1); opacity: 0; } }
+  .hole.stickyhole { border-radius: 14px; box-shadow: 0 0 0 3px #ff5a5a, 0 0 14px 4px rgba(255,90,90,.7); }
 
-    .float {
-      position: absolute;
-      left: 50%; top: 30%;
-      transform: translateX(-50%);
-      font-weight: bold;
-      font-size: 1.1rem;
-      pointer-events: none;
-      animation: floatUp 0.7s ease-out forwards;
-    }
-    .float.bonus { color: var(--bonus); }
-    .float.points { color: var(--points); }
-    .float.penalty { color: var(--penalty); }
-    @keyframes floatUp {
-      from { opacity: 1; top: 30%; }
-      to   { opacity: 0; top: -10%; }
-    }
+  #hammer { position: fixed; top: 0; left: 0; font-size: 54px; pointer-events: none;
+    transform-origin: 30% 70%; transform: translate(-14px,-44px) rotate(-25deg);
+    z-index: 100; transition: transform .05s ease-out; will-change: transform; }
+  #hammer.swing { transform: translate(-14px,-44px) rotate(28deg); }
+  #hammer2 { position: fixed; top: 0; left: 0; font-size: 48px; pointer-events: none;
+    transform-origin: 30% 70%; transform: translate(-12px,-40px) rotate(22deg);
+    z-index: 99; transition: transform .05s ease-out; will-change: transform;
+    filter: drop-shadow(0 0 5px #ff3b3b) drop-shadow(0 0 5px #ff3b3b); }
+  #hammer2.swing { transform: translate(-12px,-40px) rotate(-26deg); }
+  #hammer.saberhammer { filter: drop-shadow(0 0 6px #35d0ff) drop-shadow(0 0 12px #35d0ff); }
+  .projectile { position: fixed; font-size: 32px; pointer-events: none; z-index: 96; transform: translate(-50%,-50%); filter: drop-shadow(0 0 5px #ff3b3b); }
+  #boss.sith .bossface { filter: drop-shadow(0 0 10px #ff3b3b) drop-shadow(0 4px 8px rgba(0,0,0,.6)); }
+  #moneyHud { position: fixed; top: 8px; right: 12px; z-index: 101; font-weight: bold; font-size: 20px;
+    color: #ffe06a; text-shadow: 0 2px 0 rgba(0,0,0,.5); background: rgba(0,0,0,.3); padding: 5px 12px; border-radius: 20px; }
+  #hat { position: fixed; top: 0; left: 0; font-size: 30px; pointer-events: none; z-index: 101; transform: translate(-50%,-118%); }
+  .sheded { border-radius: 14px; box-shadow: 0 0 0 3px #b6ff6a, 0 0 14px 4px rgba(120,220,90,.7); }
+  #storeList { display: flex; flex-direction: column; gap: 8px; min-width: 340px; max-height: 300px; overflow-y: auto; }
+  .strow { display: flex; align-items: center; justify-content: space-between; gap: 14px; background: rgba(0,0,0,.32);
+    padding: 9px 14px; border-radius: 14px; font-size: 16px; }
+  .strow button { cursor: none; font: bold 14px "Trebuchet MS", sans-serif; padding: 6px 14px; border: none; border-radius: 18px;
+    background: linear-gradient(#ffd24a,#f3a712); color: #5a3a00; box-shadow: 0 4px 0 #b97a00; }
+  .strow button:disabled { background: rgba(255,255,255,.2); color: #ccc; box-shadow: none; }
+  #store { z-index: 320; background: rgba(4,20,8,.85); }
+  #wyrChoice { z-index: 330; background: rgba(20,14,30,.75); }
+  #chestGrid.rare { grid-template-columns: repeat(10, 1fr); gap: 5px; }
+  #chestGrid.rare .ctile { width: 40px; height: 40px; font-size: 18px; box-shadow: 0 3px 0 #2f6a1d !important; background: linear-gradient(#8fe06a,#4fae2f) !important; color: #123f04 !important; }
+  #chestGrid.gold { grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  #chestGrid.gold .ctile { box-shadow: 0 4px 0 #a6791a !important; background: linear-gradient(#ffe37a,#e0a92f) !important; color: #5a3e05 !important; }
+  #chestGrid.diamond { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  #chestGrid.diamond .ctile { width: 74px; height: 74px; font-size: 32px; box-shadow: 0 4px 0 #2b7fa6 !important; background: linear-gradient(#c4f0ff,#5cc7e6) !important; color: #053a4a !important; }
+  #chest.rare { background: rgba(4,26,10,.9); }
 
-    #hammer {
-      position: fixed;
-      left: 0; top: 0;
-      font-size: 2.6rem;
-      pointer-events: none;
-      transform: translate(-30%, -60%) rotate(-20deg);
-      transition: transform 0.07s ease-out;
-      z-index: 50;
-      display: none;
-    }
-    #hammer.whack { transform: translate(-30%, -60%) rotate(45deg); }
+  #overlay, #bombChoice, #sonicChoice, #chest, #powers { position: fixed; inset: 0; background: rgba(0,0,0,.62);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    color: #fff; text-align: center; z-index: 200; cursor: none; padding: 14px; overflow-y: auto; }
+  #bombChoice { z-index: 300; background: rgba(20,0,0,.65); }
+  #sonicChoice { z-index: 300; background: rgba(0,12,30,.65); }
+  #chest { z-index: 320; background: rgba(12,6,30,.82); }
+  #powers { z-index: 320; background: rgba(20,14,4,.85); }
+  #powers h2 { font-size: 32px; color: #ffd24a; }
+  #powersList { display: flex; flex-direction: column; gap: 10px; min-width: 320px; }
+  .powrow { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    background: rgba(0,0,0,.35); padding: 10px 16px; border-radius: 14px; font-size: 17px; }
+  .powrow button { cursor: none; font: bold 15px "Trebuchet MS", sans-serif; padding: 6px 18px; border: none; border-radius: 20px; }
+  .powrow button.on { background: linear-gradient(#b6ff6a,#5fbf2f); color: #143f04; box-shadow: 0 4px 0 #3d8a1d; }
+  .powrow button.off { background: rgba(255,255,255,.2); color: #fff; box-shadow: 0 4px 0 rgba(0,0,0,.3); }
+  #overlay h1 { font-size: 38px; text-shadow: 0 3px 0 rgba(0,0,0,.4); }
+  #overlay p { font-size: 14px; max-width: 560px; line-height: 1.4; opacity: .9; }
 
-    .btn {
-      margin-top: 22px;
-      padding: 12px 28px;
-      font-size: 1.05rem;
-      color: #fff;
-      background: var(--accent);
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-    }
-    .btn:hover { opacity: 0.9; }
+  #overlay button, #bombChoice button, #sonicChoice button, #chest button { cursor: none;
+    font: bold 20px "Trebuchet MS", sans-serif; padding: 11px 22px; border: none; border-radius: 40px;
+    background: linear-gradient(#ffd24a,#f3a712); color: #5a3a00; box-shadow: 0 5px 0 #b97a00; transition: transform .08s; }
+  #overlay button:active, #bombChoice button:active, #sonicChoice button:active, #chest button:active {
+    transform: translateY(4px); box-shadow: 0 1px 0 #b97a00; }
+  .menu { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 640px; }
+  .menu button { font-size: 17px; padding: 10px 18px; }
+  #mostBtn { background: linear-gradient(#7fc1ff,#3d8de0); color: #04243f; box-shadow: 0 5px 0 #2467ad; }
+  #speedBtn { background: linear-gradient(#b6ff6a,#5fbf2f); color: #143f04; box-shadow: 0 5px 0 #3d8a1d; }
+  #gearRow { display: flex; gap: 10px; align-items: center; font-weight: bold; font-size: 16px; }
+  #gearRow button { font-size: 18px; padding: 8px 16px; }
 
-    .modal-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0, 0, 0, 0.75);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      cursor: default;
-    }
-    .modal-overlay.show { display: flex; }
-    .modal {
-      background: #16213e;
-      border: 2px solid var(--penalty);
-      border-radius: 16px;
-      padding: 28px 32px;
-      max-width: 420px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-      animation: pop 0.2s ease-out;
-    }
-    @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-    .modal.good { border-color: #3aa9ff; }
-    .modal.good .modal-title { color: #3aa9ff !important; }
-    .modal-title { font-size: 1.8rem; font-weight: bold; color: var(--penalty); margin-bottom: 6px; }
-    .modal-q { font-size: 1.1rem; margin-bottom: 18px; }
-    .modal-btns { display: flex; gap: 14px; justify-content: center; }
-    .modal-btn {
-      font-size: 1.05rem; font-weight: bold;
-      padding: 14px 22px;
-      border: none; border-radius: 10px;
-      color: #1a1a2e; cursor: pointer;
-    }
-    .modal-btn.points { background: var(--points); }
-    .modal-btn.seconds { background: var(--bonus); }
-    .modal-btn:hover { filter: brightness(1.1); }
-    .modal-note { margin-top: 16px; font-size: 0.8rem; color: #999; }
-    .hint { color: #888; font-size: 0.85rem; margin-top: 10px; max-width: 500px; line-height: 1.5; }
-    .hint b.h { color: var(--bonus); }
-    .hint b.d { color: var(--points); }
-    .hint b.p { color: var(--penalty); }
-  </style>
+  #bombChoice h2, #sonicChoice h2 { font-size: 36px; } #chest h2 { font-size: 34px; }
+  #bombChoice p, #sonicChoice p, #chest p { font-size: 18px; opacity: .92; }
+  #bombChoice .choices, #sonicChoice .choices { display: flex; gap: 20px; margin-top: 8px; }
+  #bombChoice .sec, #sonicChoice .gainsec { background: linear-gradient(#7fc1ff,#3d8de0); color: #04243f; box-shadow: 0 5px 0 #2467ad; }
+  #bombChoice .pts { background: linear-gradient(#ff9a8b,#e85a45); color: #3f0a04; box-shadow: 0 5px 0 #a63522; }
+  #sonicChoice .gainpts { background: linear-gradient(#b6ff6a,#5fbf2f); color: #143f04; box-shadow: 0 5px 0 #3d8a1d; }
+
+  #chestGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .ctile { width: 62px; height: 62px; font-size: 28px; border-radius: 12px; box-shadow: 0 4px 0 #5e470f !important;
+    background: linear-gradient(#caa15a,#8a6a2e) !important; color: #3a2a08 !important; }
+  .ctile.revealed { background: linear-gradient(#ffe79a,#ffcf52) !important; animation: cpop .3s; box-shadow: 0 4px 0 #b97a00 !important; }
+  .ctile.dim { opacity: .35; }
+  @keyframes cpop { from { transform: scale(.55); } to { transform: scale(1); } }
+
+  #boardTabs { display: flex; gap: 8px; }
+  #boardTabs button { cursor: none; font: bold 13px "Trebuchet MS", sans-serif; padding: 5px 13px;
+    border: none; border-radius: 20px; background: rgba(255,255,255,.18); color: #fff; box-shadow: none; }
+  #boardTabs button.active { background: #ffd24a; color: #5a3a00; }
+  #board { background: rgba(0,0,0,.3); border-radius: 16px; padding: 9px 16px; min-width: 290px; max-height: 180px; overflow-y: auto; }
+  #board h2 { font-size: 19px; margin-bottom: 5px; color: #ffd24a; }
+  #board ol { list-style: none; }
+  #board li { display: flex; justify-content: space-between; font-size: 16px; padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,.16); }
+  #board li:last-child { border-bottom: none; }
+  #board li .rank { opacity: .7; width: 28px; text-align: left; }
+  #board li .nm { flex: 1; text-align: left; padding-left: 6px; }
+  #board li .pts { font-weight: bold; color: #b6ff6a; }
+  #board .empty { opacity: .6; font-size: 14px; padding: 5px 0; }
+  #board small { opacity: .45; font-size: 11px; }
+  .hidden { display: none !important; }
+</style>
 </head>
 <body>
   <style>
-    .topbar {
-      position: fixed; top: 0; left: 0; right: 0; height: 52px;
-      display: flex; align-items: center; gap: 12px; padding: 0 12px;
-      background: rgba(22,33,62,0.95); backdrop-filter: blur(8px);
-      border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 1000;
+    /* Back link for the minigames collection. The game hides the cursor and
+       locks scrolling, so this floats above everything and restores a pointer. */
+    #home-link {
+      position: fixed; top: 10px; left: 10px; z-index: 99999;
+      display: inline-block; padding: 7px 13px;
+      font: 600 0.9rem/1 "Trebuchet MS", system-ui, sans-serif;
+      color: #fff; text-decoration: none; cursor: pointer;
+      background: rgba(0,0,0,0.42); border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 9px; backdrop-filter: blur(6px);
     }
-    .topbar .back {
-      text-decoration: none; color: #eaeaea; font-size: 1.2rem; line-height: 1;
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 8px; padding: 7px 13px; flex-shrink: 0;
-    }
-    .topbar .back:hover { border-color: #e94560; }
-    .topbar .tabs { display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .topbar .tabs a {
-      text-decoration: none; color: #b9b9c9; font-size: 0.9rem; white-space: nowrap;
-      padding: 7px 12px; border-radius: 8px;
-    }
-    .topbar .tabs a:hover { background: rgba(255,255,255,0.06); color: #fff; }
-    .topbar .tabs a.active { background: #e94560; color: #fff; font-weight: 600; }
-    body { padding-top: 68px; }
+    #home-link:hover { background: rgba(0,0,0,0.65); border-color: #fff; }
   </style>
-  <nav class="topbar">
-    <a class="back" href="index.html" title="Back to home">← Home</a>
-  </nav>
-  <h1>🔨 Whack-a-Hedgehog 🦔🐉</h1>
+  <a id="home-link" href="index.html" title="Back to all minigames">← Home</a>
 
-  <div class="modes" id="time-modes"></div>
-  <div class="modes" id="speed-modes"></div>
-
-  <div class="stats">
-    <div class="stat">
-      <div class="label">Time</div>
-      <div class="value" id="time-value">1:00</div>
-    </div>
-    <div class="stat">
-      <div class="label">Points</div>
-      <div class="value" id="score-value">0</div>
-    </div>
-    <div class="stat">
-      <div class="label">Speed</div>
-      <div class="value" id="speed-value">1.0×</div>
-    </div>
-    <div class="stat">
-      <div class="label">Best</div>
-      <div class="value" id="best-value">0</div>
-    </div>
-    <div class="misses" title="3 wrong hits in a row = −5s">
-      <span class="miss-dot" id="dot-0"></span>
-      <span class="miss-dot" id="dot-1"></span>
-      <span class="miss-dot" id="dot-2"></span>
-    </div>
+  <div id="hud">
+    <div class="pill" id="timerPill">⏱ <span id="timer">60</span>s</div>
+    <div class="pill" id="pointsPill">⭐ <span id="points">0</span> pts</div>
+    <div class="pill" id="speedPill">⚡ <span id="speed">1</span>/<span id="speedMaxLabel">50</span></div>
+    <div class="pill" id="streakPill">🔥 <span id="streak">0</span> miss</div>
   </div>
 
-  <div class="status" id="status">Press Start, then start whacking!</div>
-
-  <div class="board" id="board"></div>
-
-  <button class="btn" id="start">Start Game</button>
-
-  <p class="subtitle">Bonk the critters for points before the clock runs out!</p>
-
-  <p class="hint">
-    🦔 <b class="h">Hedgehogs</b> give you <b class="h">+3 seconds</b> (up 3s) — but no points.<br>
-    🐉 The yellow <b class="d">3-headed dragon</b> has a head in 3 holes (up 5s) — whack <b class="d">all 3</b> for <b class="d">3 points</b>. One dragon at a time.<br>
-    💣 At <b class="p">5 points</b> bombs appear — hit one and <b class="p">time freezes</b> while you choose: lose <b class="p">10 points</b> or <b class="p">10 seconds</b>. Faster = more bombs.<br>
-    💨 <b style="color:#3aa9ff">Sonic</b> is rare &amp; <b style="color:#3aa9ff">moves every second</b> (up 5s) — catch the blue porcupine to <b style="color:#3aa9ff">gain 5 points or 5 seconds</b>!<br>
-    🔨 Hammer an empty hole <b class="p">3 times in a row</b> and you lose <b class="p">5 seconds</b>.
-  </p>
-
+  <div id="grid"></div>
+  <div id="moneyHud">💵 $0</div>
+  <div id="wonBadge" class="hidden">🏆 WINNER</div>
+  <button id="quitBtn" class="hidden">⏹ Quit round</button>
+  <div id="bigCount" class="hidden"></div>
+  <div id="roundKeys" class="hidden"></div>
+  <div id="keyTotals"></div>
   <div id="hammer">🔨</div>
+  <div id="hat" class="hidden"></div>
+  <div id="hammer2" class="hidden">🔨</div>
+  <div id="boss" class="hidden"><span class="bossface" id="bossFace">👁️</span><div class="bosshp" id="bossHearts"></div></div>
 
-  <div class="modal-overlay" id="bomb-modal">
-    <div class="modal" id="modal-box">
-      <div class="modal-title" id="modal-title">💣 BOOM!</div>
-      <div class="modal-q" id="modal-q">Would you rather lose…</div>
-      <div class="modal-btns">
-        <button class="modal-btn points" id="choose-points">−10 Points</button>
-        <button class="modal-btn seconds" id="choose-seconds">−10 Seconds</button>
-      </div>
-      <div class="modal-note">⏸ Time is frozen until you choose.</div>
+  <div id="bombChoice" class="hidden"><h2>💥 Bomb!</h2><p>Pick your penalty:</p>
+    <div class="choices"><button class="sec" id="loseSec">−10 seconds</button><button class="pts" id="losePts">−10 points</button></div></div>
+  <div id="sonicChoice" class="hidden"><h2>🦔 Caught Sonic!</h2><p>Pick your reward:</p>
+    <div class="choices"><button class="gainsec" id="gainSec">+5 seconds</button><button class="gainpts" id="gainPts">+5 points</button></div></div>
+
+  <div id="chest" class="hidden">
+    <h2>🗝️ Treasure Chest</h2>
+    <p id="chestMsg">Pick ONE tile to claim its reward…</p>
+    <div id="chestGrid"></div>
+    <button id="chestClose" class="hidden">Continue</button>
+  </div>
+
+  <div id="powers" class="hidden">
+    <h2>⭐ Your Powers</h2>
+    <p>Tap a power to turn it on or off.</p>
+    <div id="powersList"></div>
+    <button id="powersClose">Continue</button>
+  </div>
+
+  <div id="wyrChoice" class="hidden">
+    <h2>🤔 Would you rather…</h2>
+    <div class="choices">
+      <button class="gainsec" id="wyrA">A</button>
+      <button class="gainpts" id="wyrB">B</button>
     </div>
   </div>
 
-  <script>
-    const SIZE = 5;
-    const HOLES = SIZE * SIZE;       // 25
-    // You pick BOTH a length (90/60/30s) and a starting speed (slow/fast/insane).
-    // Each time×speed combination keeps its own high score.
-    const TIMES = {
-      t90: { label: "90s", time: 90 },
-      t60: { label: "60s", time: 60 },
-      t30: { label: "30s", time: 30 },
-    };
-    const TIME_ORDER = ["t90", "t60", "t30"];
-    const SPEEDS = {
-      slow:   { label: "🐢 Slow ×1",   startSpeed: 1 },
-      fast:   { label: "🐇 Fast ×3",   startSpeed: 3 },
-      insane: { label: "🔥 Insane ×5", startSpeed: 5 },
-    };
-    const SPEED_ORDER = ["slow", "fast", "insane"];
-    let timeKey = "t60";
-    let speedKey = "slow";
-    let START_TIME = TIMES[timeKey].time;   // starting seconds (set by the time mode)
-    function comboKey() { return timeKey + "-" + speedKey; }
-    function comboLabel() { return TIMES[timeKey].time + "s ×" + SPEEDS[speedKey].startSpeed; }
-    const HEDGEHOG_MS = 3000;        // a hedgehog stays up 3 seconds
-    const DRAGON_MS = 5000;          // a dragon stays up 5 seconds
-    const SPAWN_MS = 850;            // how often a hedgehog tries to pop up
-    const DRAGON_SPAWN_MS = 5000;    // how often a dragon may appear (if none up)
-    const HEDGEHOG_BONUS = 3;        // +3 seconds per hedgehog
-    const DRAGON_POINTS = 3;         // points for slaying ALL 3 heads of a dragon
-    const MISS_PENALTY = 5;          // -5 seconds for 3 wrong hits in a row
-    const MISS_LIMIT = 3;            // wrong hits in a row before the penalty
-    // Bombs: start appearing once you reach this score; more of them at higher speed.
-    const BOMB_AT_SCORE = 5;
-    const BOMB_MS = 2500;            // a bomb stays up 2.5s (don't hit it!)
-    const BOMB_SPAWN_MS = 3000;      // base gap between bombs (divided by speed)
-    const BOMB_POINTS_PENALTY = 10;  // hit a bomb → choose: lose 10 points…
-    const BOMB_TIME_PENALTY = 10;    //                  …or lose 10 seconds
-    const HS_PREFIX = "hedgehog-highscore-";   // + comboKey (time-speed) → high score
-    // Sonic: rare moving bonus — hit it to GAIN 5 points or 5 seconds.
-    const SONIC_MS = 5000;           // stays up 5 seconds
-    const SONIC_MOVE_MS = 1000;      // moves 1 square every second
-    const SONIC_SPAWN_MS = 5000;     // base gap between spawn checks…
-    const SONIC_CHANCE = 0.65;       // …and this chance each check (more likely now)
-    const SONIC_POINTS = 5;
-    const SONIC_SECONDS = 5;
+  <div id="store" class="hidden">
+    <h2>🛒 Store</h2>
+    <p id="storeMoney">💵 $0</p>
+    <div id="storeList"></div>
+    <button id="storeClose">Continue</button>
+  </div>
 
-    let timeLeft, score, wrongStreak, running, paused;
-    let type;                        // per hole: null | "hedgehog" | "dragon"
-    let up;                          // per hole: occupied (creature up)
-    let hideTimers;                  // per-hole timeout (hedgehogs)
-    let dragon;                      // { active, heads:[], timer, remaining }
-    let sonic;                       // { active, index, moveTimer, lifeTimer }
-    let sonicsCaught;                // each catch makes the next Sonic move faster
-    let spawnTimer, dragonTimer, bombTimer, sonicTimer, countdownTimer;
-    let choiceHandler = null;        // callback for the current would-you-rather modal
 
-    const boardEl = document.getElementById("board");
-    const timeEl = document.getElementById("time-value");
-    const scoreEl = document.getElementById("score-value");
-    const speedEl = document.getElementById("speed-value");
+  <div id="overlay">
+    <h1>Whack-a-Hedgehog</h1>
+    <div id="winBanner" class="hidden"></div>
+    <p id="intro">
+      <b>Classic:</b> 🐲 dragon (+3) · 🦔 hedgehog (+3s) · blue Sonic (+5s/+5pts) · 💣 bomb (don't hit!) ·
+      🗝️ keys give <b>no points</b> — you collect them (some drop as <b>×3</b> triples!) · 👁️ <b>bosses</b> every 50 pts, in order 1→8: solo eyes, then <b>5-at-once</b> swarms, a 💣 −30s bomb-eye, an all-in-a-row gauntlet, and a final all-together JACKPOT (rewards scale: key → rare → gold → diamond → 5 of every key!).<br>
+      <b>Key tiers:</b> 🗝️ normal → 🔑 <span style="color:#7de07d">rare</span> (after you earn 25 keys) → 🔑 <span style="color:#ffcf4a">gold</span> (spend 25 rare) → 🔑 <span style="color:#7fdcff">diamond</span> (spend 25 gold) → 💚 <span style="color:#2fe38a"><b>THE Emerald Key</b></span> (trade 25 diamond → <b>WIN!</b>). Each opens its own chest: rare = 50 all-useful · gold = 25 · diamond = 9 (incl. the 🏠 House: +$100 per whack!). The Emerald Key grants a 🏰 mansion, 💚 emerald hammer, 👑 throne, a daily $1000 + present, and eternal bragging rights. <b>You can only buy/trade UP to the next key tier after fully clearing that tier's chest grid</b> (normal = both grids) — finishing a grid opens the Store &amp; unlocks the trade. ⚡ speed to 50.<br>
+      <b>Daily (10×10):</b> catch Sonics, avoid hedgehogs — hit 3 hedgehogs &amp; you're out.
+      <b>Most Sonics</b> (60s) or <b>Speedrun 10</b> (fastest, 3 hedgehogs = fail).<br>
+      <b>Versus</b> (unlock from a chest): P1 = mouse, P2 = <b>WASD + Space</b>. 🦔=+1, blue Sonic=+2, 💣=−1, 🔑 keys score here (normal +2, rare +4, gold +6, diamond +8; triples ×3). Most points in 60s wins.
+    </p>
+    <div class="menu" id="baseMenu">
+      <button id="startBtn">▶ Classic</button>
+      <button id="mostBtn">📅 Most Sonics</button>
+      <button id="speedBtn">⚡ Speedrun 10</button>
+    </div>
+    <div class="menu" id="unlockRow"></div>
+    <div id="gearRow"></div>
+    <div id="boardTabs">
+      <button data-b="classic">Classic</button>
+      <button data-b="most">Most Sonics</button>
+      <button data-b="speed">Speedrun 10</button>
+    </div>
+    <div id="board"></div>
+    <button id="resetBtn">🗑️ Reset progress</button>
+  </div>
 
-    // Animals get quicker as your score climbs: the mode sets the STARTING speed,
-    // then +4% per point on top of that, capped at 10×.
-    function speedFactor() { return Math.min(10, SPEEDS[speedKey].startSpeed + score * 0.04); }
-    function hedgehogUpMs() { return Math.max(450, Math.round(HEDGEHOG_MS / speedFactor())); }
-    function dragonUpMs()   { return Math.max(1200, Math.round(DRAGON_MS / speedFactor())); }
-    function hedgehogGapMs() { return Math.max(180, Math.round(SPAWN_MS / speedFactor())); }
-    function dragonGapMs()   { return Math.max(900, Math.round(DRAGON_SPAWN_MS / speedFactor())); }
-    function bombUpMs()      { return Math.max(700, Math.round(BOMB_MS / speedFactor())); }
-    function bombGapMs()     { return Math.max(300, Math.round(BOMB_SPAWN_MS / speedFactor())); }
-    // Each Sonic you catch makes the next one hop faster (floor 250ms).
-    function sonicMoveMs()   { return Math.max(250, Math.round(SONIC_MOVE_MS / (1 + sonicsCaught * 0.5))); }
-    const statusEl = document.getElementById("status");
-    const hammerEl = document.getElementById("hammer");
-    const startBtn = document.getElementById("start");
-    const bestEl = document.getElementById("best-value");
-    const bombModal = document.getElementById("bomb-modal");
-    const modalBox = document.getElementById("modal-box");
-    const modalTitle = document.getElementById("modal-title");
-    const modalQ = document.getElementById("modal-q");
-    const choosePointsBtn = document.getElementById("choose-points");
-    const chooseSecondsBtn = document.getElementById("choose-seconds");
+<script>
+(() => {
+  const CONFIG = {
+    cols: 5, hogMs: 3000, dragonMs: 5000, bombMs: 2800, keyUpMs: 4500,
+    startTime: 60, hitBonusSec: 3, missPenaltySec: 5, missLimit: 3,
+    dragonPoints: 3, dragonChance: 0.26,
+    bombUnlock: 10, bombChanceMin: 0.10, bombChanceMax: 0.42, bombPenaltySec: 10, bombPenaltyPts: 10, freezeSec: 4,
+    sonicChance: 0.11, sonicUpMs: 7000, sonicMoveSlow: 1000, sonicMoveFast: 250, sonicCatchCap: 10, sonicBonusSec: 5, sonicBonusPts: 5,
+    keyChance: 0.08, rareKeyChance: 0.018, goldKeyChance: 0.012, diamondKeyChance: 0.008,
+    tripleKeyChance: 0.16, rareKeyGate: 25, tierUnlockCost: 25, emeraldTradeCost: 25, houseChance: 0.05, houseWhack: 100,
+    mansionChance: 0.05, mansionWhack: 1000, emeraldSonicBonus: 100, dailyPlayBonus: 1000,
+    vsKeyChance: 0.14, keyPoints: 0, rareKeyPoints: 0, bossEvery: 50, bossHearts: 10, bossMoveMs: 1100, bossThrowMs: 750,
+    speedMax: 50, pointsPerLevel: 3, delaySlow: 1150, delayFast: 23, maxActive: 4, endRushSec: 12, maxActiveEnd: 12,
+    dailyCols: 10, dailyTime: 60, dailySpeedTarget: 10, dailyStrikes: 3,
+    dailySonicCount: 4, dailyHogCount: 6, dailyHopSlow: 850, dailyHopFast: 200, dailyHopCap: 10, dailyHogHop: 800,
+    rulesVersion: 17
+  };
+  // key tiers: glyph, css tint class, per-tier points in Versus/2P (classic gives none), spendable balance field
+  const KEY_TIERS = {
+    key:        { glyph: '🗝️', cls: '',          gem: '',   vsPts: 2,  bal: 'keys',        name: 'key' },
+    rareKey:    { glyph: '🔑', cls: 'krare',     gem: '🟢', vsPts: 4,  bal: 'rareKeys',    name: 'rare key' },
+    goldKey:    { glyph: '🔑', cls: 'kgold',     gem: '🟡', vsPts: 6,  bal: 'goldKeys',    name: 'gold key' },
+    diamondKey: { glyph: '🔑', cls: 'kdiamond',  gem: '🔷', vsPts: 8,  bal: 'diamondKeys', name: 'diamond key' },
+    emeraldKey: { glyph: '🔑', cls: 'kemerald',  gem: '💚', vsPts: 20, bal: 'emeraldKeys', name: 'emerald key' }
+  };
+  const isKeyType = t => !!KEY_TIERS[t];
+  // once you obtain a key of a tier, that tier starts appearing in the game from then on
+  function markKeyGotten(tier) { if (tier === 'rareKey') unlocks.rareUnlocked = true;
+    else if (tier === 'goldKey') unlocks.goldUnlocked = true; else if (tier === 'diamondKey') unlocks.diamondUnlocked = true; }
+  // live tally of keys collected THIS round (shown on-screen during play)
+  let roundKeys = { key: 0, rareKey: 0, goldKey: 0, diamondKey: 0 };
+  function resetRoundKeys() { roundKeys = { key: 0, rareKey: 0, goldKey: 0, diamondKey: 0 }; }
+  function addRoundKey(tier, n) { if (roundKeys[tier] === undefined) return; roundKeys[tier] += n; renderRoundKeys(); updateKeyTotals(); }
+  function updateKeyTotals() {                    // your total key counts — always visible
+    let h = 'Keys: 🗝️ ' + (unlocks.keys || 0) + ' · 🟢 ' + (unlocks.rareKeys || 0) + ' · 🟡 ' + (unlocks.goldKeys || 0) + ' · 🔷 ' + (unlocks.diamondKeys || 0);
+    if (unlocks.emerald) h += ' · 💚 ' + unlocks.emerald;
+    keyTotalsEl.innerHTML = h; }
+  function renderRoundKeys() { roundKeysEl.innerHTML = '<b>This round:</b> ' +
+    ['key', 'rareKey', 'goldKey', 'diamondKey'].map(t => { const info = KEY_TIERS[t]; return (info.gem || '') + info.glyph + ' ' + roundKeys[t]; }).join(' &nbsp; '); }
+  const SIG = JSON.stringify(CONFIG);
+  const SIG_KEY = 'whackHogSig', CLASSIC_KEY = 'whack::classic', UNLOCK_KEY = 'hh_unlocks';
+  const HAMMER_POOL = ['🔨','⚒️','🛠️','🔧','🪓','⛏️','🪛','⚔️','🏏','🏒','🥍','🪃','🔱','🪄','🦴'];
+  const POWER_POOL = [
+    { id:'bombHalf',       label:'Bombs do half damage' },
+    { id:'missNothing',    label:'Missing does nothing' },
+    { id:'bossFewerBombs', label:'Bosses throw fewer bombs' },
+    { id:'extraTime',      label:'Start with +10 seconds' },
+    { id:'slowMo',         label:'Critters stay up longer' },
+    { id:'keyMagnet',      label:'Keys appear twice as often' },
+    { id:'richDragons',    label:'Dragons give +2 extra points' },
+    { id:'bombShield',     label:'Ignore the first bomb each round' },
+    { id:'bossRandom',     label:'Bosses appear in random order' },
+    { id:'startMinute',    label:'Start with a full extra minute (+60s)' }
+  ];
+  const POWER_INFO = {}; POWER_POOL.forEach(p => POWER_INFO[p.id] = p.label);
+  const GRID_REWARDS = [
+    { kind:'grid', val:'mountain',   icon:'⛰️', label:'GRID: Mountain (rocks block holes)' },
+    { kind:'grid', val:'g4',         icon:'🔳', label:'GRID: 4×4' },
+    { kind:'grid', val:'g6',         icon:'🔲', label:'GRID: 6×6' },
+    { kind:'grid', val:'bombRound',  icon:'💣', label:'GRID: Bomb Round' },
+    { kind:'grid', val:'sonicRound', icon:'🦔', label:'GRID: Sonic Round' }
+  ];
+  const MODE_REWARDS = [
+    { kind:'mode', val:'twoPlayer',    icon:'👥', label:'MODE: 2 Player (local, split controls)' },
+    { kind:'mode', val:'vsCpu',        icon:'🤖', label:'MODE: You vs Computer' },
+    { kind:'mode', val:'hard',         icon:'🔥', label:'MODE: Hard Mode' },
+    { kind:'mode', val:'bossesAlways', icon:'👁️', label:'MODE: Bosses Always' },
+    { kind:'mode', val:'newChests',    icon:'🎁', label:'BONUS: a free extra key!' }
+  ];
+  const SPECIAL_HAMMER = { saber:'🗡️', aoe:'🪓', time:'⏱️', gold:'💰', star:'🌟', rocket:'🚀', diamond:'💎', emerald:'💚' };
+  // store-ONLY hammers — never appear in the normal chest or the rare chest
+  const STORE_HAMMERS = [
+    { id:'star',    glyph:'🌟', cost:700,  label:'🌟 Star Hammer — +2 points per hedgehog' },
+    { id:'rocket',  glyph:'🚀', cost:900,  label:'🚀 Rocket Hammer — splash hits all 4 side holes' },
+    { id:'diamond', glyph:'💎', cost:1200, label:'💎 Diamond Hammer — earn $10 per hedgehog' }
+  ];
+  const BETTER_HAMMERS = [
+    { id:'aoe',  label:'Splash Hammer — also hits the 2 side holes' },
+    { id:'time', label:'Time Hammer — +1s per hedgehog' },
+    { id:'gold', label:'Gold Hammer — earn $5 per hedgehog' }
+  ];
+  const HAT_POOL = ['🎩','👑','🧢','🎓','🪖','⛑️'];
+  const WYR_PAIRS = [
+    [ { id:'dragonHeads1', label:'Dragon heads give 1 pt each' }, { id:'dragonBig5', label:'Dragons give 5 points' } ],
+    [ { id:'panic15', label:'+5 points when you drop to 15s' }, { id:'overtime', label:'+5s twice when time runs out' } ],
+    [ { id:'keysLessRare', label:'Keys are a bit less rare' }, { id:'keyBonus5', label:'Bonus key when you have 5+' } ]
+  ];
+  const WYR_INFO = {}; WYR_PAIRS.forEach(p => p.forEach(o => WYR_INFO[o.id] = o.label));
+  Object.keys(WYR_INFO).forEach(k => POWER_INFO[k] = WYR_INFO[k]);   // WYR powers show in the panel too
 
-    function loadHigh() { return Number(localStorage.getItem(HS_PREFIX + comboKey())) || 0; }
-    // Append a result to a shared leaderboard list (read by the menu page).
-    function pushRecord(key, entry) {
-      let a; try { a = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { a = []; }
-      a.push(entry); if (a.length > 50) a = a.slice(-50);
-      localStorage.setItem(key, JSON.stringify(a));
-    }
+  const $ = id => document.getElementById(id);
+  const gridEl=$('grid'), hammer=$('hammer'), overlay=$('overlay'), introEl=$('intro'), boardEl=$('board'),
+        boardTabs=$('boardTabs'), timerPill=$('timerPill'), pointsPill=$('pointsPill'), speedPill=$('speedPill'),
+        streakPill=$('streakPill'), startBtn=$('startBtn'), mostBtn=$('mostBtn'), speedBtn=$('speedBtn'),
+        unlockRow=$('unlockRow'), gearRow=$('gearRow'), bossEl=$('boss'), bossHearts=$('bossHearts'), bossFace=$('bossFace'),
+        bombChoice=$('bombChoice'), loseSecBtn=$('loseSec'), losePtsBtn=$('losePts'),
+        sonicChoice=$('sonicChoice'), gainSecBtn=$('gainSec'), gainPtsBtn=$('gainPts'),
+        chest=$('chest'), chestGrid=$('chestGrid'), chestMsg=$('chestMsg'), chestClose=$('chestClose'),
+        powersEl=$('powers'), powersList=$('powersList'), powersClose=$('powersClose'), hammer2=$('hammer2'),
+        moneyHud=$('moneyHud'), hatEl=$('hat'), storeEl=$('store'), storeListEl=$('storeList'), storeMoney=$('storeMoney'),
+        storeClose=$('storeClose'), wyrChoice=$('wyrChoice'), wyrA=$('wyrA'), wyrB=$('wyrB'),
+        wonBadge=$('wonBadge'), winBanner=$('winBanner'), quitBtn=$('quitBtn'), resetBtn=$('resetBtn'), bigCount=$('bigCount'), roundKeysEl=$('roundKeys'), keyTotalsEl=$('keyTotals');
+  let timerEl, pointsEl, speedEl, streakEl;
+  let vs = null;
 
-    // --- build board ---
-    function buildBoard() {
-      boardEl.innerHTML = "";
-      for (let i = 0; i < HOLES; i++) {
-        const hole = document.createElement("div");
-        hole.className = "hole";
-        hole.dataset.index = i;
-        hole.innerHTML = '<div class="creature"></div>';
-        boardEl.appendChild(hole);
-      }
-    }
-    function holeEl(i) { return boardEl.children[i]; }
+  let mode='classic', gridCols=CONFIG.cols, holes=[], running=false, picking=false, boardView='classic';
+  let classicOpts = {};
+  let timeLeft=CONFIG.startTime, points=0, missStreak=0;
+  let countdownId=null, popId=null, freezeTicks=0;
+  let bombChoiceKind=null, sonicChoiceKind=null;
+  let dragonActive=false, sonicActive=false, caughtSonics=0, keyActive=false, bombShieldUsed=false;
+  let shedActive=false, pinataActive=false, houseActive=false, mansionActive=false, helperId=null, overtimeUsed=0, panicUsed=false;
+  let chestKind='normal', wyrPending=-1;
+  let sonic={hole:null,lifeTimeout:null,moveTimeout:null};
+  let bossActive=false, nextBossAt=CONFIG.bossEvery, bossPending=false, bossCount=0;
+  let bosses=[], bossEncounter=0, bossSeq=null, encounterReward=null;
+  let projectiles=[], projRaf=null, mouseX=window.innerWidth/2, mouseY=window.innerHeight/2;
+  let daily=null, dailyClockId=null, dailyRng=Math.random;
+  let chestPicked=false;
 
-    function formatTime(s) {
-      s = Math.max(0, s);
-      const m = Math.floor(s / 60);
-      const sec = s % 60;
-      return m + ":" + String(sec).padStart(2, "0");
-    }
-    function updateStats() {
-      timeEl.textContent = formatTime(timeLeft);
-      scoreEl.textContent = score;
-      timeEl.classList.toggle("low", timeLeft <= 5);
-      speedEl.textContent = speedFactor().toFixed(1) + "×";
-      for (let d = 0; d < MISS_LIMIT; d++) {
-        document.getElementById("dot-" + d).classList.toggle("on", d < wrongStreak);
-      }
-    }
-    function floatText(i, text, kind) {
-      const span = document.createElement("span");
-      span.className = "float " + kind;
-      span.textContent = text;
-      holeEl(i).appendChild(span);
-      setTimeout(() => span.remove(), 700);
-    }
+  // ---------- unlocks (persist across versions) ----------
+  function defaultUnlocks() { return { hammers:['🔨'], equipped:'🔨', keys:0, board:null, keysEarned:0, rareUnlocked:false,
+    goldKeys:0, goldBoard:null, goldUnlocked:false, diamondKeys:0, diamondBoard:null, diamondUnlocked:false, houseUnlocked:false,
+    emerald:0, hasWon:false, part2:false, part2won:false, winnerName:null, lastBonusDay:null, streak:0, lastPlayDay:null, boardsDone:{normal:0,rare:0,gold:0,diamond:0},
+    money:0, rareKeys:0, rareBoard:null, shedsUnlocked:false, hats:[], hat:null,
+    store:{ pinata:false, helper:false },
+    powers:{bombHalf:false,missNothing:false,bossFewerBombs:false},
+    powersOn:{bombHalf:true,missNothing:true,bossFewerBombs:true},
+    grids:{mountain:false,g4:false,g6:false,bombRound:false,sonicRound:false},
+    modes:{twoPlayer:false,vsCpu:false,hard:false,bossesAlways:false} }; }
+  // one-time full reset of everything
+  (function resetAll() { try { if (localStorage.getItem('hh_reset') !== 'r11') {
+    const kill = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && (k.indexOf('whack') === 0 || k.indexOf('hh_') === 0)) kill.push(k); }
+    kill.forEach(k => localStorage.removeItem(k)); localStorage.setItem('hh_reset', 'r11');
+  } } catch (e) {} })();
+  let unlocks = loadUnlocks();
+  // Part 2 was removed — one-time refund of the $1,000,000 to anyone who had paid to unlock it.
+  // Must run BEFORE any saveUnlocks() below, which would drop the old part2 flag from storage.
+  let part2Refunded = false;
+  (function refundPart2() { try { if (localStorage.getItem('hh_p2refund2') !== '1') {
+    const raw = JSON.parse(localStorage.getItem(UNLOCK_KEY) || 'null');
+    if (raw && raw.part2) { unlocks.money = (unlocks.money || 0) + 1000000; part2Refunded = true; }
+    unlocks.part2 = false; unlocks.part2won = false; saveUnlocks();
+    localStorage.setItem('hh_p2refund2', '1'); } } catch (e) {} })();
+  // one-time: grant newly-added powers to existing saves so they're usable right away
+  (function grantNewPowers() { try { if (localStorage.getItem('hh_grant') !== 'g1') {
+    ['bossRandom', 'startMinute'].forEach(id => { unlocks.powers[id] = true; if (unlocks.powersOn[id] === undefined) unlocks.powersOn[id] = true; });
+    saveUnlocks(); localStorage.setItem('hh_grant', 'g1'); } } catch (e) {} })();
+  function loadUnlocks() {
+    try {
+      const u = JSON.parse(localStorage.getItem(UNLOCK_KEY) || 'null');
+      if (!u) return defaultUnlocks();
+      const d = defaultUnlocks();
+      return { hammers: u.hammers || d.hammers, equipped: u.equipped || d.equipped, keys: u.keys || 0, board: u.board || null,
+        keysEarned: u.keysEarned || 0, rareUnlocked: !!u.rareUnlocked,
+        goldKeys: u.goldKeys || 0, goldBoard: u.goldBoard || null, goldUnlocked: !!u.goldUnlocked,
+        diamondKeys: u.diamondKeys || 0, diamondBoard: u.diamondBoard || null, diamondUnlocked: !!u.diamondUnlocked, houseUnlocked: !!u.houseUnlocked,
+        emerald: Number(u.emerald) || 0, hasWon: !!u.hasWon || (Number(u.emerald) || 0) > 0, part2: !!u.part2, part2won: !!u.part2won, winnerName: u.winnerName || null, lastBonusDay: u.lastBonusDay || null, streak: u.streak || 0, lastPlayDay: u.lastPlayDay || null,
+        boardsDone: Object.assign({ normal: 0, rare: 0, gold: 0, diamond: 0 }, u.boardsDone || {}),
+        money: u.money || 0, rareKeys: u.rareKeys || 0, rareBoard: u.rareBoard || null, shedsUnlocked: !!u.shedsUnlocked,
+        hats: u.hats || [], hat: u.hat || null, store: Object.assign(d.store, u.store || {}),
+        powers: Object.assign(d.powers, u.powers || {}), powersOn: Object.assign(d.powersOn, u.powersOn || {}),
+        grids: Object.assign(d.grids, u.grids || {}), modes: Object.assign(d.modes, u.modes || {}) };
+    } catch (e) { return defaultUnlocks(); }
+  }
+  function saveUnlocks() { try { localStorage.setItem(UNLOCK_KEY, JSON.stringify(unlocks)); } catch (e) {} }
+  function isSaber() { return unlocks.equipped === 'saber'; }
+  function isBetter(id) { return unlocks.equipped === id; }
+  function hammerGlyph(v) { return SPECIAL_HAMMER[v] || v; }
+  function setHammer() { hammer.textContent = hammerGlyph(unlocks.equipped); hammer.classList.toggle('saberhammer', !!SPECIAL_HAMMER[unlocks.equipped]); }
+  function addMoney(n) { if (unlocks.emerald) n *= 2; unlocks.money = (unlocks.money || 0) + n; saveUnlocks(); updateMoneyHud(); }
+  function updateMoneyHud() { moneyHud.textContent = '💵 $' + (unlocks.money || 0); }
+  function setHat() { if (unlocks.hat) { hatEl.textContent = unlocks.hat; hatEl.classList.remove('hidden'); } else hatEl.classList.add('hidden'); }
+  function powerOn(name) { return !!(unlocks.powers[name] && unlocks.powersOn[name] !== false); }
+  function upMul() { return powerOn('slowMo') ? 1.35 : 1; }
 
-    // --- popping up / down ---
-    // A light-blue porcupine drawn as inline SVG (Sonic) — NOT a hedgehog emoji.
-    const PORCUPINE_SVG =
-      '<svg viewBox="0 0 100 100" width="100%" height="100%" style="display:block">' +
-        '<g fill="#1f6fc4">' +              // quills (darker blue)
-          '<polygon points="16,60 4,20 30,52"/>' +
-          '<polygon points="28,52 22,8 42,46"/>' +
-          '<polygon points="42,46 42,2 54,44"/>' +
-          '<polygon points="54,44 64,4 66,44"/>' +
-          '<polygon points="64,45 80,12 76,47"/>' +
-          '<polygon points="74,50 92,28 82,53"/>' +
-          '<polygon points="12,66 0,48 26,60"/>' +
-        '</g>' +
-        '<ellipse cx="48" cy="66" rx="36" ry="21" fill="#7ec4ff"/>' +   // body
-        '<ellipse cx="82" cy="69" rx="14" ry="11" fill="#a6d8ff"/>' +    // snout
-        '<rect x="32" y="83" width="7" height="11" rx="3" fill="#4a97e0"/>' + // legs
-        '<rect x="56" y="83" width="7" height="11" rx="3" fill="#4a97e0"/>' +
-        '<circle cx="95" cy="71" r="3.2" fill="#10243a"/>' +            // nose
-        '<circle cx="78" cy="64" r="3.4" fill="#10243a"/>' +            // eye
-        '<circle cx="79.2" cy="62.8" r="1.1" fill="#fff"/>' +           // eye shine
-      '</svg>';
+  // ---------- storage / leaderboards ----------
+  function today() { return new Date().toISOString().slice(0, 10); }
+  function sigCheck() {
+    if (localStorage.getItem(SIG_KEY) !== SIG) {
+      try { const kill = [];
+        for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf('whack') === 0 && k !== SIG_KEY) kill.push(k); }
+        kill.forEach(k => localStorage.removeItem(k)); localStorage.setItem(SIG_KEY, SIG);
+      } catch (e) {}
+    }
+  }
+  function loadList(key) { try { sigCheck(); return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+  function storeList(key, list) { try { localStorage.setItem(key, JSON.stringify(list)); } catch (e) {} }
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function dailyKey(kind) { return 'whack::daily::' + kind + '::' + today(); }
+  function tryRecord(key, score, lowerBetter, cap) {
+    const s = loadList(key); const full = s.length >= cap; const worst = s.length ? s[s.length - 1].score : null;
+    if (!(!full || (lowerBetter ? score < worst : score > worst))) return false;
+    let name = window.prompt('🏆 New record!\nEnter your name:', 'YOU'); name = (name || 'YOU').trim().slice(0, 10) || 'YOU';
+    s.push({ name, score, date: today() }); s.sort((a, b) => lowerBetter ? a.score - b.score : b.score - a.score);
+    storeList(key, s.slice(0, cap)); return true;
+  }
+  function renderBoardView(view) {
+    boardView = view; [...boardTabs.children].forEach(b => b.classList.toggle('active', b.dataset.b === view));
+    if (view === 'classic') renderList(loadList(CLASSIC_KEY), '🏆 Classic — High Scores', ' pts', false);
+    else if (view === 'most') renderList(loadList(dailyKey('most')), '📅 Most Sonics today', ' 🦔', true);
+    else renderList(loadList(dailyKey('speed')), '⚡ Fastest to 10 today', 's', true);
+  }
+  function renderList(s, title, suffix, showDate) {
+    let html = '<h2>' + title + '</h2>';
+    if (!s.length) html += '<div class="empty">No scores yet — be the first!</div>';
+    else { html += '<ol>'; s.forEach((e, i) => { const date = (showDate && e.date) ? ' <small>' + e.date + '</small>' : '';
+      html += '<li><span class="rank">' + (i + 1) + '.</span><span class="nm">' + escapeHtml(e.name) + date + '</span><span class="pts">' + e.score + suffix + '</span></li>'; }); html += '</ol>'; }
+    boardEl.innerHTML = html;
+  }
+  [...boardTabs.children].forEach(b => b.addEventListener('click', e => { e.stopPropagation(); renderBoardView(b.dataset.b); }));
 
-    function showCreature(i, emoji, kind) {
-      type[i] = kind;
-      up[i] = true;
-      const el = holeEl(i);
-      const c = el.querySelector(".creature");
-      if (kind === "sonic") { c.textContent = ""; c.innerHTML = PORCUPINE_SVG; }
-      else { c.innerHTML = ""; c.textContent = emoji; }
-      el.classList.add("up");
-      if (kind === "dragon") el.classList.add("dragon");
-      if (kind === "sonic") el.classList.add("sonic");
-    }
-    function popDown(i) {
-      up[i] = false;
-      type[i] = null;
-      const el = holeEl(i);
-      el.classList.remove("up", "bonk", "dragon", "sonic");
-      clearTimeout(hideTimers[i]);
-      hideTimers[i] = null;
-    }
+  // ---------- grid ----------
+  function buildGrid(cols) {
+    gridCols = cols; holes = []; gridEl.innerHTML = '';
+    gridEl.classList.toggle('big', cols >= 8); gridEl.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+    for (let i = 0; i < cols * cols; i++) { const el = document.createElement('div'); el.className = 'hole';
+      holes.push({ el, idx: i, up: false, rock: false, sticky: false, type: null, group: null, headDone: false, timeout: null }); gridEl.appendChild(el); }
+  }
+  function applyMountain() {
+    const n = Math.max(4, Math.floor(holes.length * 0.24)); const pool = holes.slice();
+    for (let i = 0; i < n; i++) { const h = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+      h.rock = true; h.el.classList.add('rock'); h.el.innerHTML = '<div class="rockface">🪨</div>'; }
+  }
+  function downHoles() { return holes.filter(h => !h.up && !h.rock); }
+  function neighborsOf(hole) {
+    const i = hole.idx, r = Math.floor(i / gridCols), c = i % gridCols, out = [];
+    if (r > 0) out.push(holes[i - gridCols]); if (r < gridCols - 1) out.push(holes[i + gridCols]);
+    if (c > 0) out.push(holes[i - 1]); if (c < gridCols - 1) out.push(holes[i + 1]);
+    return out.filter(h => !h.up && !h.rock);
+  }
+  function raiseUp(hole) { requestAnimationFrame(() => requestAnimationFrame(() => { if (hole.up) hole.el.classList.add('up'); })); }
+  function bonkDown(hole) { hole.up = false; clearTimeout(hole.timeout); hole.el.classList.remove('up', 'headdone');
+    hole.el.classList.add('bonked'); const el = hole.el; setTimeout(() => el.classList.remove('bonked'), 250); }
+  function floatText(text, x, y, kind) { const f = document.createElement('div'); f.className = 'float ' + kind; f.textContent = text;
+    f.style.left = x + 'px'; f.style.top = y + 'px'; document.body.appendChild(f); setTimeout(() => f.remove(), 1000); }
+  function flash(text, kind) { floatText(text, window.innerWidth / 2, window.innerHeight / 2 - 90, kind); }
 
-    function spawnHedgehog() {
-      if (!running || paused) return;
-      const free = [];
-      for (let i = 0; i < HOLES; i++) if (!up[i]) free.push(i);
-      if (free.length === 0) return;
-      const i = free[Math.floor(Math.random() * free.length)];
-      showCreature(i, "🦔", "hedgehog");
-      hideTimers[i] = setTimeout(() => popDown(i), hedgehogUpMs());
+  // ---------- HUD ----------
+  function setHudLabels() {
+    if (mode === 'classic') {
+      timerPill.innerHTML = '⏱ <span id="timer">60</span>s'; pointsPill.innerHTML = '⭐ <span id="points">0</span> pts';
+      speedPill.innerHTML = '⚡ <span id="speed">1</span>/' + CONFIG.speedMax; streakPill.innerHTML = '🔥 <span id="streak">0</span> miss';
+    } else if (mode === 'most') {
+      timerPill.innerHTML = '⏱ <span id="timer">60</span>s'; pointsPill.innerHTML = '🦔 <span id="points">0</span>';
+      speedPill.innerHTML = '⚡ spd <span id="speed">0</span>'; streakPill.innerHTML = '❌ <span id="streak">0</span>/' + CONFIG.dailyStrikes;
+    } else if (mode === 'speed') {
+      timerPill.innerHTML = '⏱ <span id="timer">0.0</span>s'; pointsPill.innerHTML = '🦔 <span id="points">0</span>/' + CONFIG.dailySpeedTarget;
+      speedPill.innerHTML = '⚡ spd <span id="speed">0</span>'; streakPill.innerHTML = '❌ <span id="streak">0</span>/' + CONFIG.dailyStrikes;
+    } else {
+      timerPill.innerHTML = '⏱ <span id="timer">60</span>s'; pointsPill.innerHTML = '🔨 P1 <span id="points">0</span>';
+      speedPill.innerHTML = (vs && vs.isCpu ? '🤖 CPU ' : '⌨️ P2 ') + '<span id="speed">0</span>'; streakPill.innerHTML = '⚔️ <span id="streak">VS</span>';
     }
+    timerEl = $('timer'); pointsEl = $('points'); speedEl = $('speed'); streakEl = $('streak');
+  }
+  function updateHud() {
+    if (mode === 'classic') {
+      timerEl.textContent = timeLeft; pointsEl.textContent = points; speedEl.textContent = speedLevel(); streakEl.textContent = missStreak;
+      timerEl.classList.toggle('low', timeLeft <= 10 && freezeTicks === 0); checkBoss();
+    } else if (mode === 'most') {
+      timerEl.textContent = daily.time; pointsEl.textContent = daily.caught;
+      speedEl.textContent = Math.min(daily.caught, CONFIG.dailyHopCap); streakEl.textContent = daily.strikes;
+      timerEl.classList.toggle('low', daily.time <= 10);
+    } else if (mode === 'speed') {
+      timerEl.textContent = ((Date.now() - daily.startMs) / 1000).toFixed(1); pointsEl.textContent = daily.caught;
+      speedEl.textContent = Math.min(daily.caught, CONFIG.dailyHopCap); streakEl.textContent = daily.strikes;
+    } else {
+      timerEl.textContent = vs.time; pointsEl.textContent = vs.p1; speedEl.textContent = vs.p2;
+      timerEl.classList.toggle('low', vs.time <= 10);
+    }
+  }
 
-    function spawnDragon() {
-      if (!running || paused || dragon.active) return;
-      const free = [];
-      for (let i = 0; i < HOLES; i++) if (!up[i]) free.push(i);
-      if (free.length < 3) return;
-      // pick 3 distinct holes
-      const heads = [];
-      while (heads.length < 3) {
-        const i = free[Math.floor(Math.random() * free.length)];
-        if (!heads.includes(i)) heads.push(i);
-      }
-      heads.forEach(i => showCreature(i, "🐉", "dragon"));
-      dragon = { active: true, heads: heads, remaining: 3, timer: null };
-      dragon.timer = setTimeout(escapeDragon, dragonUpMs());
-      statusEl.textContent = "🐉 A 3-headed dragon! Whack all 3 heads!";
-    }
-    function escapeDragon() {
-      dragon.heads.forEach(i => { if (type[i] === "dragon") popDown(i); });
-      dragon = { active: false, heads: [], remaining: 0, timer: null };
-    }
+  // ================= CLASSIC =================
+  function speedLevel() { return Math.min(CONFIG.speedMax, 1 + Math.floor(points / CONFIG.pointsPerLevel)); }
+  function speedT() { return (speedLevel() - 1) / (CONFIG.speedMax - 1); }
 
-    function spawnBomb() {
-      if (!running || paused || score < BOMB_AT_SCORE) return;
-      const free = [];
-      for (let i = 0; i < HOLES; i++) if (!up[i]) free.push(i);
-      if (free.length === 0) return;
-      const i = free[Math.floor(Math.random() * free.length)];
-      showCreature(i, "💣", "bomb");
-      hideTimers[i] = setTimeout(() => popDown(i), bombUpMs());
-    }
+  function hitHog(hole, x, y) { const bonus = CONFIG.hitBonusSec + (isBetter('time') ? 1 : 0); timeLeft += bonus;
+    floatText('+' + bonus + 's', x, y, 'good');
+    if (isBetter('gold')) addMoney(5);
+    if (isBetter('diamond')) addMoney(10);
+    if (isBetter('star')) { points += 2; floatText('+2 pts', x, y - 22, 'gold'); }
+    if (isBetter('emerald')) { addMoney(50); points += 3; floatText('💚 +3 pts +$50', x, y - 22, 'gold'); }
+    bonkDown(hole); }
+  function aoeHit(hole) { const c = hole.idx % gridCols; const sides = [];
+    if (c > 0) sides.push(holes[hole.idx - 1]); if (c < gridCols - 1) sides.push(holes[hole.idx + 1]);
+    sides.forEach(n => { if (n && n.up && n.type === 'hog') { const r = n.el.getBoundingClientRect(); hitHog(n, r.left + r.width / 2, r.top + r.height / 2); } }); }
+  function megaHit(hole) { const i = hole.idx, c = i % gridCols, r = Math.floor(i / gridCols), sides = [];
+    if (c > 0) sides.push(holes[i - 1]); if (c < gridCols - 1) sides.push(holes[i + 1]);
+    if (r > 0) sides.push(holes[i - gridCols]); if (r < gridCols - 1) sides.push(holes[i + gridCols]);
+    sides.forEach(n => { if (n && n.up && n.type === 'hog') { const rr = n.el.getBoundingClientRect(); hitHog(n, rr.left + rr.width / 2, rr.top + rr.height / 2); } }); }
+  function popShed(hole) { hole.up = true; hole.type = 'shed'; hole.el.classList.remove('bonked'); hole.el.classList.add('sheded');
+    hole.el.innerHTML = '<div class="critter" style="font-size:52px">🛖</div>'; raiseUp(hole); shedActive = true;
+    hole.timeout = setTimeout(() => { hole.up = false; hole.type = null; hole.el.classList.remove('up', 'sheded'); hole.el.innerHTML = ''; shedActive = false; }, 5000); }
+  function hitShed(hole, x, y) { addMoney(10); floatText('+$10', x, y, 'gold'); }
+  function popHouse(hole) { hole.up = true; hole.type = 'house'; hole.el.classList.remove('bonked'); hole.el.classList.add('sheded');
+    hole.el.innerHTML = '<div class="critter" style="font-size:52px">🏠</div>'; raiseUp(hole); houseActive = true;
+    hole.timeout = setTimeout(() => { hole.up = false; hole.type = null; hole.el.classList.remove('up', 'sheded'); hole.el.innerHTML = ''; houseActive = false; }, 5000); }
+  function hitHouse(hole, x, y) { addMoney(CONFIG.houseWhack); floatText('+$' + CONFIG.houseWhack, x, y, 'gold'); }
+  function popMansion(hole) { hole.up = true; hole.type = 'mansion'; hole.el.classList.remove('bonked'); hole.el.classList.add('sheded');
+    hole.el.innerHTML = '<div class="critter" style="font-size:52px">🏰</div>'; raiseUp(hole); mansionActive = true;
+    hole.timeout = setTimeout(() => { hole.up = false; hole.type = null; hole.el.classList.remove('up', 'sheded'); hole.el.innerHTML = ''; mansionActive = false; }, 6000); }
+  function hitMansion(hole, x, y) { addMoney(CONFIG.mansionWhack); floatText('🏰 +$' + CONFIG.mansionWhack, x, y, 'gold'); }
+  // ===== THE EMERALD KEY — the ultimate win =====
+  function grantEmerald() {
+    unlocks.money = (unlocks.money || 0) + 10000;    // flat $10,000 on claiming an emerald key (never doubled)
+    unlocks.emerald = (unlocks.emerald || 0) + 1;    // you can hold more than one emerald key
+    unlocks.hasWon = true;                           // winning is permanent — perks survive selling the key
+    if (!unlocks.hammers.includes('emerald')) unlocks.hammers.push('emerald'); unlocks.equipped = 'emerald'; setHammer();
+    if (!unlocks.hats.includes('👑')) unlocks.hats.push('👑'); unlocks.hat = '👑'; setHat();
+    if (!unlocks.winnerName) { let nm = window.prompt('🏆💚 YOU WON THE GAME!\nEnter your name for the Certificate of Victory:', 'CHAMPION');
+      unlocks.winnerName = (nm || 'CHAMPION').trim().slice(0, 16) || 'CHAMPION'; }
+    saveUnlocks(); updateWinBanner(); updateMoneyHud(); updateKeyTotals();
+    flash('🏆💚 EMERALD KEY #' + unlocks.emerald + '! You WON — mansion unlocked! +$10,000!', 'gold');
+  }
+  function yesterday() { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); }
+  function dailyLogin() {                          // play-streak: the more days in a row you play, the better the reward (once/day)
+    const d = today(); if (unlocks.lastPlayDay === d) return;
+    unlocks.streak = (unlocks.lastPlayDay === yesterday()) ? (unlocks.streak || 0) + 1 : 1;   // consecutive day? continue, else restart
+    unlocks.lastPlayDay = d;
+    const money = Math.min(unlocks.streak, 20) * 500;                          // grows $500/day, caps at $10k/day
+    addMoney(money);
+    let msg = '🔥 ' + unlocks.streak + '-day streak! +$' + money;
+    if (unlocks.streak % 7 === 0) { unlocks.rareKeys++; markKeyGotten('rareKey'); msg += ' + 🔑 rare key'; }        // weekly milestone
+    else if (unlocks.streak % 3 === 0) { unlocks.keys++; unlocks.keysEarned = (unlocks.keysEarned || 0) + 1; markKeyGotten('key'); msg += ' + 🗝️ key'; }
+    if (unlocks.emerald) { addMoney(CONFIG.dailyPlayBonus);                    // emerald owners also keep their daily $1000 + a new hammer
+      const avail = HAMMER_POOL.filter(h => !unlocks.hammers.includes(h));
+      if (avail.length) { const h = avail[Math.floor(Math.random() * avail.length)]; unlocks.hammers.push(h); msg += ' + 🎁 ' + h; }
+      msg += ' + 💚 $' + CONFIG.dailyPlayBonus; }
+    saveUnlocks(); flash(msg, 'gold');
+  }
+  function updateWinBanner() {
+    if (unlocks.hasWon) {
+      wonBadge.classList.remove('hidden'); winBanner.classList.remove('hidden');
+      winBanner.innerHTML = '<h3>🏆💚 ' + escapeHtml(unlocks.winnerName || 'CHAMPION') + ' has WON Whack-a-Hedgehog! 💚🏆</h3>'
+        + '<div class="cert">📜 <b>Certificate of Victory</b> — awarded for claiming THE Emerald Key. '
+        + 'Bragging rights granted: everyone who plays this game sees your name here.</div>'
+        + '<div class="perks">👑 Emerald Throne · 🏰 Mansion ($' + CONFIG.mansionWhack + '/whack) · 💚 Emerald Hammer · 🏠 Emerald House · 💵 $' + CONFIG.dailyPlayBonus + '/day + a present daily</div>';
+    } else { wonBadge.classList.add('hidden'); winBanner.classList.add('hidden'); }
+  }
+  function popPinata(hole) { hole.up = true; hole.type = 'pinata'; hole.el.classList.remove('bonked');
+    hole.el.innerHTML = '<div class="critter" style="font-size:50px">💰</div>'; raiseUp(hole); pinataActive = true;
+    hole.timeout = setTimeout(() => { hole.up = false; hole.type = null; hole.el.classList.remove('up'); hole.el.innerHTML = ''; pinataActive = false; }, 2500); }
+  function hitPinata(hole, x, y) { addMoney(50); floatText('💰 +$50', x, y, 'gold'); pinataActive = false; bonkDown(hole); hole.type = null; }
+  function bombPenSec() { return powerOn('bombHalf') ? Math.round(CONFIG.bombPenaltySec / 2) : CONFIG.bombPenaltySec; }
+  function bombPenPts() { return powerOn('bombHalf') ? Math.round(CONFIG.bombPenaltyPts / 2) : CONFIG.bombPenaltyPts; }
+  function hitBomb(hole, x, y) { bonkDown(hole);
+    if (powerOn('bombShield') && !bombShieldUsed) { bombShieldUsed = true; floatText('🛡️ shielded!', x, y, 'good'); return; }
+    if (bombChoiceKind === null) { floatText('💣', x, y, 'frost'); openBombChoice(); } else applyBombPenalty(bombChoiceKind, x, y); }
+  function hitSticky(hole, x, y) {   // stuck bomb: penalty; stays until the boss dies (unless emerald hammer clears it)
+    if (isBetter('emerald')) { hole.sticky = false; hole.up = false; hole.type = null; hole.el.classList.remove('up', 'stickyhole'); hole.el.innerHTML = ''; }  // permanent bombs leave, penalty still applies
+    if (bombChoiceKind === null) { floatText('💣 stuck!', x, y, 'frost'); openBombChoice(); } else applyBombPenalty(bombChoiceKind, x, y); }
+  function openBombChoice() { picking = true; timerPill.classList.add('frozen'); bombChoice.classList.remove('hidden'); }
+  function resolveBomb(kind) { picking = false; timerPill.classList.remove('frozen'); bombChoice.classList.add('hidden'); bombChoiceKind = kind; applyBombPenalty(kind); }
+  function applyBombPenalty(kind, x, y) { let msg;
+    if (kind === 'sec') { timeLeft = Math.max(0, timeLeft - bombPenSec()); msg = '💥 −' + bombPenSec() + 's'; }
+    else { points = Math.max(0, points - bombPenPts()); msg = '💥 −' + bombPenPts() + ' pts'; }
+    if (x === undefined) flash(msg, 'bad'); else floatText(msg, x, y, 'bad'); updateHud(); if (timeLeft <= 0) endGame(); }
+  loseSecBtn.addEventListener('click', e => { e.stopPropagation(); resolveBomb('sec'); });
+  losePtsBtn.addEventListener('click', e => { e.stopPropagation(); resolveBomb('pts'); });
 
-    // Orthogonal neighbours (1 square away) that are currently empty.
-    function freeNeighbors(i) {
-      const r = Math.floor(i / SIZE), c = i % SIZE;
-      const cand = [];
-      if (r > 0)        cand.push(i - SIZE);
-      if (r < SIZE - 1) cand.push(i + SIZE);
-      if (c > 0)        cand.push(i - 1);
-      if (c < SIZE - 1) cand.push(i + 1);
-      return cand.filter(n => !up[n]);
-    }
-    function spawnSonic() {
-      if (!running || paused || sonic.active) return;
-      if (Math.random() >= SONIC_CHANCE) return;   // rare
-      const free = [];
-      for (let i = 0; i < HOLES; i++) if (!up[i]) free.push(i);
-      if (free.length === 0) return;
-      const i = free[Math.floor(Math.random() * free.length)];
-      showCreature(i, "🦔", "sonic");
-      sonic = { active: true, index: i, moveTimer: null, lifeTimer: null };
-      sonic.lifeTimer = setTimeout(escapeSonic, SONIC_MS);
-      sonic.moveTimer = setInterval(moveSonic, sonicMoveMs());
-      statusEl.textContent = "💨 Sonic appeared — catch him for a bonus!";
-    }
-    function moveSonic() {
-      if (!sonic.active || paused) return;
-      const options = freeNeighbors(sonic.index);
-      if (options.length === 0) return;            // boxed in — stay put this tick
-      const next = options[Math.floor(Math.random() * options.length)];
-      popDown(sonic.index);
-      showCreature(next, "🦔", "sonic");
-      sonic.index = next;
-    }
-    function escapeSonic() {
-      if (sonic.moveTimer) clearInterval(sonic.moveTimer);
-      if (sonic.lifeTimer) clearTimeout(sonic.lifeTimer);
-      if (type[sonic.index] === "sonic") popDown(sonic.index);
-      sonic = { active: false, index: -1, moveTimer: null, lifeTimer: null };
-    }
+  function hitDragonHead(hole, x, y) { const g = hole.group; if (!g || hole.headDone) return;
+    hole.headDone = true; hole.el.classList.remove('dragonhole'); bonkDown(hole); g.headsLeft--;
+    if (powerOn('dragonHeads1')) points += 1;
+    if (g.headsLeft <= 0) { const base = powerOn('dragonBig5') ? 5 : CONFIG.dragonPoints; const dp = base + (powerOn('richDragons') ? 2 : 0); points += dp; floatText('🐲 +' + dp + ' pts!', x, y, 'gold');
+      clearTimeout(g.timeout); g.holes.forEach(h => { h.el.classList.remove('dragonhole'); bonkDown(h); }); dragonActive = false; }
+    else floatText(g.headsLeft + ' head' + (g.headsLeft > 1 ? 's' : '') + ' left!', x, y, 'gold'); }
 
-    // --- clicking ---
-    function onBoardClick(e) {
-      if (!running || paused) return;
-      const hole = e.target.closest(".hole");
-      if (!hole) return;
-      const i = Number(hole.dataset.index);
+  function classicMiss(x, y) {
+    if (powerOn('missNothing')) return;              // power: missing does nothing
+    missStreak++;
+    if (missStreak >= CONFIG.missLimit) { missStreak = 0; timeLeft = Math.max(0, timeLeft - CONFIG.missPenaltySec);
+      floatText('−' + CONFIG.missPenaltySec + 's', x, y, 'bad'); if (timeLeft <= 0) endGame(); }
+    else floatText('miss', x, y, 'bad'); updateHud();
+  }
 
-      if (up[i] && type[i] === "hedgehog") {
-        // hedgehog → time bonus, no points
-        timeLeft += HEDGEHOG_BONUS;
-        wrongStreak = 0;
-        hole.classList.add("bonk");
-        floatText(i, "+" + HEDGEHOG_BONUS + "s", "bonus");
-        setTimeout(() => popDown(i), 120);
-        statusEl.textContent = "Hedgehog! +" + HEDGEHOG_BONUS + " seconds";
-      } else if (up[i] && type[i] === "dragon") {
-        // dragon head → no points yet; you must slay ALL 3 heads
-        wrongStreak = 0;
-        hole.classList.add("bonk");
-        setTimeout(() => popDown(i), 120);
-        dragon.remaining--;
-        dragon.heads = dragon.heads.filter(h => h !== i);
-        if (dragon.remaining <= 0) {
-          clearTimeout(dragon.timer);
-          dragon.active = false;
-          score += DRAGON_POINTS;
-          floatText(i, "+" + DRAGON_POINTS, "points");
-          statusEl.textContent = "🐉 Dragon slain! +" + DRAGON_POINTS + " points!";
-        } else {
-          floatText(i, (3 - dragon.remaining) + "/3", "points");
-          statusEl.textContent = "Dragon head down — " + (3 - dragon.remaining) + "/3, get the rest!";
-        }
-      } else if (up[i] && type[i] === "sonic") {
-        // sonic → freeze time, "would you rather GAIN 5 points or 5 seconds?"
-        wrongStreak = 0;
-        sonicsCaught++;        // next Sonic will move faster
-        hole.classList.add("bonk");
-        escapeSonic();
-        openSonicModal();
-        return;
-      } else if (up[i] && type[i] === "bomb") {
-        // bomb → freeze time, "would you rather LOSE 10 points or 10 seconds?"
-        wrongStreak = 0;
-        hole.classList.add("bonk");
-        setTimeout(() => popDown(i), 120);
-        openBombModal();
-        return;
-      } else {
-        // empty hole → miss
-        wrongStreak++;
-        if (wrongStreak >= MISS_LIMIT) {
-          timeLeft -= MISS_PENALTY;
-          wrongStreak = 0;
-          floatText(i, "-" + MISS_PENALTY + "s", "penalty");
-          statusEl.textContent = "Missed 3 in a row! -" + MISS_PENALTY + " seconds";
-          if (timeLeft <= 0) { updateStats(); return endGame(); }
-        } else {
-          statusEl.textContent = "Missed! (" + wrongStreak + "/" + MISS_LIMIT + ")";
-        }
-      }
-      updateStats();
-    }
+  // keys — tiered (normal / rare / gold / diamond); triples give 3 at once
+  function keyMarkup(tier, triple) { const info = KEY_TIERS[tier];
+    return '<div class="critter key ' + info.cls + '">' + info.glyph
+      + (info.gem ? '<span class="kgem">' + info.gem + '</span>' : '')
+      + (triple ? '<span class="x3">×3</span>' : '') + '</div>'; }
+  function popKey(hole, tier, triple) { hole.up = true; hole.type = tier; hole.keyTriple = !!triple;
+    hole.el.classList.remove('bonked', 'dragonhole', 'sonichole'); hole.el.classList.add('keyhole');
+    hole.el.innerHTML = keyMarkup(tier, triple); raiseUp(hole); keyActive = true;
+    hole.timeout = setTimeout(() => { hole.up = false; hole.el.classList.remove('up', 'keyhole'); keyActive = false; }, CONFIG.keyUpMs); }
+  function keyIsTriple(tier) {
+    if (isBetter('emerald')) return true;                                      // emerald hammer: EVERY key is a triple
+    return (tier === 'key' || tier === 'rareKey') && Math.random() < CONFIG.tripleKeyChance; }
+  function spawnKey(tier) { const d = downHoles(); if (!d.length) return;
+    popKey(d[Math.floor(Math.random() * d.length)], tier, keyIsTriple(tier)); }
+  function collectKey(hole, x, y) { const tier = hole.type, triple = !!hole.keyTriple, info = KEY_TIERS[tier], n = triple ? 3 : 1;
+    keyActive = false; clearTimeout(hole.timeout); hole.el.classList.remove('keyhole'); bonkDown(hole); hole.type = null; hole.keyTriple = false;
+    unlocks[info.bal] = (unlocks[info.bal] || 0) + n; markKeyGotten(tier); addRoundKey(tier, n);
+    if (tier === 'key') { unlocks.keysEarned = (unlocks.keysEarned || 0) + n;                       // lifetime normal keys → gates rare keys
+      if (powerOn('keyBonus5') && unlocks.keys >= 5) { unlocks.keys++; unlocks.keysEarned++; floatText('🗝️ bonus!', x, y - 24, 'gold'); } }
+    saveUnlocks();                                                                                  // keys give NO points in classic
+    floatText(info.glyph + ' +' + n + ' ' + info.name + (triple ? ' (triple!)' : ''), x, y, 'gold'); }
 
-    // --- self-rescheduling spawners (faster as score rises) ---
-    function scheduleHedgehog() {
-      if (!running) return;
-      spawnHedgehog();
-      spawnTimer = setTimeout(scheduleHedgehog, hedgehogGapMs());
-    }
-    function scheduleDragon() {
-      if (!running) return;
-      spawnDragon();
-      dragonTimer = setTimeout(scheduleDragon, dragonGapMs());
-    }
-    function scheduleBomb() {
-      if (!running) return;
-      spawnBomb();
-      // gap shrinks with speed → the faster you go, the more bombs
-      bombTimer = setTimeout(scheduleBomb, bombGapMs());
-    }
-    function scheduleSonic() {
-      if (!running) return;
-      spawnSonic();
-      sonicTimer = setTimeout(scheduleSonic, SONIC_SPAWN_MS);
-    }
+  // sonic
+  function placeSonic(hole) { sonic.hole = hole; hole.up = true; hole.type = 'sonic'; hole.group = null;
+    hole.el.classList.remove('bonked', 'dragonhole'); hole.el.classList.add('sonichole');
+    hole.el.innerHTML = '<div class="critter sonic">🦔</div>'; raiseUp(hole); }
+  function vacateSonic(hole) { if (!hole) return; hole.up = false; hole.type = null; hole.el.classList.remove('up', 'sonichole'); hole.el.innerHTML = ''; }
+  function sonicHopMs() { const c = Math.min(caughtSonics, CONFIG.sonicCatchCap); return CONFIG.sonicMoveSlow - (c / CONFIG.sonicCatchCap) * (CONFIG.sonicMoveSlow - CONFIG.sonicMoveFast); }
+  function scheduleSonicHop() { sonic.moveTimeout = setTimeout(() => { const cur = sonic.hole; let ch = neighborsOf(cur);
+    if (!ch.length) ch = downHoles().filter(h => h !== cur); if (ch.length) { vacateSonic(cur); placeSonic(ch[Math.floor(Math.random() * ch.length)]); } scheduleSonicHop(); }, sonicHopMs()); }
+  function spawnSonic() { const down = downHoles(); if (!down.length) return; sonicActive = true;
+    placeSonic(down[Math.floor(Math.random() * down.length)]); sonic.lifeTimeout = setTimeout(despawnSonic, CONFIG.sonicUpMs); scheduleSonicHop(); }
+  function clearSonic() { clearTimeout(sonic.lifeTimeout); clearTimeout(sonic.moveTimeout); sonic.lifeTimeout = sonic.moveTimeout = null; }
+  function despawnSonic() { clearSonic(); vacateSonic(sonic.hole); sonic.hole = null; sonicActive = false; }
+  function catchSonic(hole, x, y) { clearSonic(); hole.el.classList.remove('sonichole'); bonkDown(hole); hole.type = null;
+    sonic.hole = null; sonicActive = false; caughtSonics++;
+    points += 2; floatText('🦔 +2 pts', x, y - 44, 'gold'); updateHud();          // sonic bonus points
+    if (unlocks.emerald) { addMoney(CONFIG.emeraldSonicBonus); floatText('💚 +$' + CONFIG.emeraldSonicBonus, x, y - 24, 'gold'); }
+    if (sonicChoiceKind === null) openSonicChoice(); else applySonicReward(sonicChoiceKind, x, y); }
+  function openSonicChoice() { picking = true; timerPill.classList.add('frozen'); sonicChoice.classList.remove('hidden'); }
+  function resolveSonic(kind) { picking = false; timerPill.classList.remove('frozen'); sonicChoice.classList.add('hidden'); sonicChoiceKind = kind; applySonicReward(kind); }
+  function applySonicReward(kind, x, y) { let msg; if (kind === 'sec') { timeLeft += CONFIG.sonicBonusSec; msg = '🦔 +' + CONFIG.sonicBonusSec + 's'; }
+    else { points += CONFIG.sonicBonusPts; msg = '🦔 +' + CONFIG.sonicBonusPts + ' pts'; } if (x === undefined) flash(msg, 'frost'); else floatText(msg, x, y, 'frost'); updateHud(); }
+  gainSecBtn.addEventListener('click', e => { e.stopPropagation(); resolveSonic('sec'); });
+  gainPtsBtn.addEventListener('click', e => { e.stopPropagation(); resolveSonic('pts'); });
 
-    // --- "would you rather" questions (bombs lose, sonic gains) ---
-    function openChoice(opts) {
-      paused = true;        // stop time until answered
-      modalTitle.textContent = opts.title;
-      modalQ.textContent = opts.question;
-      choosePointsBtn.textContent = opts.pointsLabel;
-      chooseSecondsBtn.textContent = opts.secondsLabel;
-      modalBox.classList.toggle("good", !!opts.good);
-      choiceHandler = opts.onChoose;
-      statusEl.textContent = opts.status;
-      bombModal.classList.add("show");
-    }
-    function answerChoice(kind) {
-      if (!choiceHandler) return;
-      bombModal.classList.remove("show");
-      paused = false;
-      const handler = choiceHandler;
-      choiceHandler = null;
-      handler(kind);
-      updateStats();
-      if (timeLeft <= 0) endGame();
-    }
-    function openBombModal() {
-      openChoice({
-        title: "💣 BOOM!",
-        question: "Would you rather LOSE…",
-        pointsLabel: "−" + BOMB_POINTS_PENALTY + " Points",
-        secondsLabel: "−" + BOMB_TIME_PENALTY + " Seconds",
-        status: "💣 Bomb! Choose your penalty…",
-        good: false,
-        onChoose: kind => {
-          if (kind === "points") {
-            score = Math.max(0, score - BOMB_POINTS_PENALTY);
-            statusEl.textContent = "💣 You lost " + BOMB_POINTS_PENALTY + " points.";
-          } else {
-            timeLeft -= BOMB_TIME_PENALTY;
-            statusEl.textContent = "💣 You lost " + BOMB_TIME_PENALTY + " seconds.";
-          }
-        }
-      });
-    }
-    function openSonicModal() {
-      openChoice({
-        title: "💨 Gotta go fast!",
-        question: "Would you rather GAIN…",
-        pointsLabel: "+" + SONIC_POINTS + " Points",
-        secondsLabel: "+" + SONIC_SECONDS + " Seconds",
-        status: "💨 You caught Sonic! Choose your reward…",
-        good: true,
-        onChoose: kind => {
-          if (kind === "points") {
-            score += SONIC_POINTS;
-            statusEl.textContent = "💨 +" + SONIC_POINTS + " points!";
-          } else {
-            timeLeft += SONIC_SECONDS;
-            statusEl.textContent = "💨 +" + SONIC_SECONDS + " seconds!";
-          }
-        }
-      });
-    }
+  // ----- BOSSES (entity-based: many at once) -----
+  const BOSS_ENCOUNTERS = {
+    1: { flash: '👁️ BOSS 1! Hit the eye!',                           reward: 'key',        groups: [{ kind: 1, hearts: CONFIG.bossHearts, count: 1 }] },
+    2: { flash: '😈 BOSS 2! Hit it while OPEN!',                      reward: 'key',        groups: [{ kind: 2, hearts: CONFIG.bossHearts, count: 1 }] },
+    3: { flash: '👁️👁️ BOSS 3! FIVE Boss 1s (5 ❤ each) — rare key!',  reward: 'rareKey',    groups: [{ kind: 1, hearts: 5, count: 5 }] },
+    4: { flash: '😈😈 BOSS 4! FIVE Boss 2s (5 ❤ each) — rare key!',   reward: 'rareKey',    groups: [{ kind: 2, hearts: 5, count: 5 }] },
+    5: { flash: '💣 BOSS 5! Closed eye is a −30s BOMB — gold key!',   reward: 'goldKey',    groups: [{ kind: 5, hearts: CONFIG.bossHearts, count: 1 }] },
+    6: { flash: '💣💣 BOSS 6! FIVE Boss 5s (5 ❤ each) — gold key!',   reward: 'goldKey',    groups: [{ kind: 5, hearts: 5, count: 5 }] },
+    7: { flash: '🌪️ BOSS 7! ALL bosses in a row — DIAMOND key!',     reward: 'diamondKey', sequential: [1, 2, 3, 4, 5, 6] },
+    8: { flash: '🏆 BOSS 8! ALL bosses TOGETHER — the JACKPOT!',      reward: 'jackpot',    groups: [{ kind: 1, hearts: 5, count: 5 }, { kind: 2, hearts: 5, count: 5 }, { kind: 5, hearts: 5, count: 5 }] }
+  };
+  function heartsHtml(n, max) { n = Math.max(0, n); return '<span style="color:#ff5a6a">' + '❤'.repeat(n) + '</span><span style="opacity:.3">' + '🖤'.repeat(Math.max(0, max - n)) + '</span>'; }
+  function makeBossEl() { const el = document.createElement('div'); el.className = 'bossmini';
+    const faceEl = document.createElement('span'); faceEl.className = 'bossface'; el.appendChild(faceEl);
+    const hpEl = document.createElement('div'); hpEl.className = 'bosshp'; el.appendChild(hpEl);
+    document.body.appendChild(el); return { el, faceEl, hpEl }; }
+  function setBossFace(b) { b.faceEl.textContent = b.open ? '👁️' : (b.kind === 5 ? '💣' : '😑'); b.el.classList.toggle('bclosed', !b.open); }
+  function updateEntityHp(b) { b.hpEl.innerHTML = heartsHtml(b.hearts, b.maxHearts); }
+  function moveBossEntity(b) { if (b.dead) return;
+    b.el.style.left = (30 + Math.random() * Math.max(40, window.innerWidth - 150)) + 'px';
+    b.el.style.top = (50 + Math.random() * Math.max(40, window.innerHeight * 0.55)) + 'px';
+    b.timers.push(setTimeout(() => moveBossEntity(b), CONFIG.bossMoveMs)); }
+  function bossThrowEntity(b) { if (b.dead) return;
+    const chance = powerOn('bossFewerBombs') ? 0.4 : 0.8;
+    if (holes.filter(h => h.up).length < activeCap() && Math.random() < chance) { const d = downHoles(); if (d.length) popBomb(d[Math.floor(Math.random() * d.length)]); }
+    b.timers.push(setTimeout(() => bossThrowEntity(b), CONFIG.bossThrowMs)); }
+  function blinkEntity(b) { const dur = b.open ? 2600 : 1000;
+    b.timers.push(setTimeout(() => { if (b.dead) return; b.open = !b.open; setBossFace(b);
+      if (!b.open && b.kind === 2) dropStickyBomb();          // boss-2 drops a sticky bomb when it closes
+      blinkEntity(b); }, dur)); }
+  function dropStickyBomb() { if (holes.filter(h => h.sticky).length >= 4) return; const d = downHoles(); if (!d.length) return;
+    const hole = d[Math.floor(Math.random() * d.length)]; hole.up = true; hole.sticky = true; hole.type = 'sticky';
+    hole.el.classList.remove('bonked', 'dragonhole', 'sonichole'); hole.el.classList.add('stickyhole');
+    hole.el.innerHTML = '<div class="critter bomb">💣</div>'; raiseUp(hole); }      // no timeout → stays till bosses die
+  function clearStickyBombs() { holes.forEach(h => { if (h.sticky) { h.sticky = false; h.up = false; h.type = null; h.el.classList.remove('up', 'stickyhole'); h.el.innerHTML = ''; } }); }
+  function spawnBossEntity(kind, hearts) { const parts = makeBossEl();
+    const b = { el: parts.el, faceEl: parts.faceEl, hpEl: parts.hpEl, kind, hearts, maxHearts: hearts, open: true, dead: false, timers: [] };
+    if (kind === 5) b.el.classList.add('bomblid');
+    bosses.push(b); setBossFace(b); updateEntityHp(b); moveBossEntity(b);
+    if (kind === 1) bossThrowEntity(b); else if (kind === 2 || kind === 5) blinkEntity(b); }
+  function spawnGroup(groups) { groups.forEach(g => { for (let i = 0; i < g.count; i++) spawnBossEntity(g.kind, g.hearts); }); }
+  function startSubEncounter(n) { const E = BOSS_ENCOUNTERS[n]; flash('▶ ' + E.flash, 'bad'); spawnGroup(E.groups); }
+  function startBoss() { bossCount++; bossEncounter = powerOn('bossRandom') ? (1 + Math.floor(Math.random() * 8)) : (((bossCount - 1) % 8) + 1); nextBossAt += CONFIG.bossEvery;
+    bossActive = true; const E = BOSS_ENCOUNTERS[bossEncounter]; encounterReward = E.reward; flash(E.flash, 'bad');
+    if (E.sequential) { bossSeq = E.sequential.slice(); startSubEncounter(bossSeq.shift()); } else spawnGroup(E.groups); }
+  function hitBossEntity(b, x, y) { if (b.dead) return;
+    const emH = isBetter('emerald');
+    if (!b.open && (b.kind === 2 || b.kind === 5)) {
+      if (b.kind === 5) { timeLeft = Math.max(0, timeLeft - 10); floatText('💣 −10s!', x, y, 'bad'); updateHud(); if (timeLeft <= 0) endGame(); return; }   // bomb back: −10s no matter what
+      if (emH) { b.hearts--; updateEntityHp(b); floatText('💚 −1 ❤ (back!)', x, y, 'gold'); if (b.hearts <= 0) killBossEntity(b); }               // emerald hits the back of the eye
+      else floatText('closed! 😑', x, y, 'frost');
+      return; }
+    const dmg = emH ? 2 : 1; b.hearts -= dmg; updateEntityHp(b); floatText(emH ? '💚 −2 ❤' : '−1 ❤', x, y, emH ? 'gold' : 'bad'); if (b.hearts <= 0) killBossEntity(b); }
+  function killBossEntity(b) { b.dead = true; b.timers.forEach(clearTimeout); b.timers = []; b.el.remove();
+    bosses = bosses.filter(x => x !== b); if (bosses.length === 0) finishEncounter(); }
+  function finishEncounter() {
+    if (bossSeq && bossSeq.length) { startSubEncounter(bossSeq.shift()); return; }   // boss 7: next in the row
+    const reward = encounterReward; endBoss(); grantBossReward(reward); }
+  function grantBossReward(reward) {
+    if (reward === 'key') { unlocks.keys++; unlocks.keysEarned = (unlocks.keysEarned || 0) + 1; markKeyGotten('key'); flash('🗝️ KEY! Boss defeated!', 'gold'); }
+    else if (reward === 'rareKey') { unlocks.rareKeys = (unlocks.rareKeys || 0) + 1; markKeyGotten('rareKey'); flash('🔑 RARE KEY! Boss defeated!', 'gold'); }
+    else if (reward === 'goldKey') { unlocks.goldKeys = (unlocks.goldKeys || 0) + 1; markKeyGotten('goldKey'); flash('🔑 GOLD KEY! Boss defeated!', 'gold'); }
+    else if (reward === 'diamondKey') { unlocks.diamondKeys = (unlocks.diamondKeys || 0) + 1; markKeyGotten('diamondKey'); flash('🔑 DIAMOND KEY! Boss defeated!', 'gold'); }
+    else if (reward === 'jackpot') { unlocks.keys += 5; unlocks.keysEarned = (unlocks.keysEarned || 0) + 5; unlocks.rareKeys = (unlocks.rareKeys || 0) + 5;
+      unlocks.goldKeys = (unlocks.goldKeys || 0) + 5; unlocks.diamondKeys = (unlocks.diamondKeys || 0) + 5;
+      markKeyGotten('rareKey'); markKeyGotten('goldKey'); markKeyGotten('diamondKey'); flash('🏆 JACKPOT! 5 of every key!', 'gold'); }
+    saveUnlocks(); updateKeyTotals(); }
+  function endBoss() { bosses.forEach(b => { b.dead = true; b.timers.forEach(clearTimeout); b.el.remove(); });
+    bosses = []; bossActive = false; bossSeq = null; encounterReward = null; clearStickyBombs(); }
+  function checkBoss() {
+    if (!running || mode !== 'classic' || bossActive) return;
+    if (classicOpts.bossesAlways) { if (!bossPending) { bossPending = true; setTimeout(() => { bossPending = false; if (running && mode === 'classic' && !bossActive) startBoss(); }, 1500); } return; }
+    if (points >= nextBossAt) startBoss();
+  }
 
-    // --- timer ---
-    function tick() {
-      if (paused) return;   // bomb question freezes the clock
-      timeLeft--;
-      updateStats();
-      if (timeLeft <= 0) endGame();
-    }
+  // spawners
+  function popHog(hole) { hole.up = true; hole.type = 'hog'; hole.group = null; hole.headDone = false; hole.el.classList.remove('bonked', 'dragonhole'); hole.el.innerHTML = '<div class="critter hog">🦔</div>'; raiseUp(hole); hole.timeout = setTimeout(() => { hole.up = false; hole.el.classList.remove('up'); }, CONFIG.hogMs * upMul()); }
+  function popBomb(hole) { hole.up = true; hole.type = 'bomb'; hole.group = null; hole.headDone = false; hole.el.classList.remove('bonked', 'dragonhole'); hole.el.innerHTML = '<div class="critter bomb">💣</div>'; raiseUp(hole); hole.timeout = setTimeout(() => { hole.up = false; hole.el.classList.remove('up'); }, CONFIG.bombMs * upMul()); }
+  function popDragon() { const down = downHoles(); if (down.length < 3) return; const pool = down.slice(), chosen = [];
+    for (let i = 0; i < 3; i++) chosen.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    const group = { headsLeft: 3, holes: chosen, timeout: null }; dragonActive = true;
+    chosen.forEach(h => { h.up = true; h.type = 'dragonHead'; h.group = group; h.headDone = false; h.el.classList.remove('bonked'); h.el.classList.add('dragonhole'); h.el.innerHTML = '<div class="critter dhead">🐲</div>'; raiseUp(h); });
+    group.timeout = setTimeout(() => { chosen.forEach(h => { if (h.up && h.type === 'dragonHead') { h.up = false; h.el.classList.remove('up'); } h.el.classList.remove('dragonhole'); }); dragonActive = false; }, CONFIG.dragonMs * upMul()); }
+  function bombChance() { let c = CONFIG.bombChanceMin + speedT() * (CONFIG.bombChanceMax - CONFIG.bombChanceMin); if (classicOpts.hard) c += 0.15; return c; }
+  function inEndRush() { return timeLeft <= CONFIG.endRushSec; }
+  function activeCap() { let c = CONFIG.maxActive; if (inEndRush()) c = CONFIG.maxActiveEnd; if (bossActive) c = Math.max(c, 14); if (classicOpts.hard) c += 3; return c; }
+  function popSomething() {
+    if (holes.filter(h => h.up).length >= activeCap()) return;
+    if (!keyActive) { const mag = powerOn('keyMagnet') ? 2 : 1;                                    // tiered keys, each gated by progression
+      if (unlocks.diamondUnlocked && Math.random() < CONFIG.diamondKeyChance * mag) { spawnKey('diamondKey'); return; }
+      if (unlocks.goldUnlocked && Math.random() < CONFIG.goldKeyChance * mag) { spawnKey('goldKey'); return; }
+      if (((unlocks.keysEarned || 0) >= CONFIG.rareKeyGate || unlocks.rareUnlocked) && Math.random() < CONFIG.rareKeyChance * mag) { spawnKey('rareKey'); return; }
+      if (Math.random() < CONFIG.keyChance * mag * (powerOn('keysLessRare') ? 1.5 : 1)) { spawnKey('key'); return; } }
+    if (unlocks.hasWon && !mansionActive && Math.random() < CONFIG.mansionChance) { const d = downHoles(); if (d.length) { popMansion(d[Math.floor(Math.random() * d.length)]); return; } }
+    if (unlocks.houseUnlocked && !unlocks.hasWon && !houseActive && Math.random() < CONFIG.houseChance) { const d = downHoles(); if (d.length) { popHouse(d[Math.floor(Math.random() * d.length)]); return; } }   // mansion replaces houses
+    if (unlocks.shedsUnlocked && !unlocks.houseUnlocked && !shedActive && Math.random() < 0.06) { const d = downHoles(); if (d.length) { popShed(d[Math.floor(Math.random() * d.length)]); return; } }   // houses replace sheds
+    if (unlocks.store.pinata && !pinataActive && Math.random() < 0.05) { const d = downHoles(); if (d.length) { popPinata(d[Math.floor(Math.random() * d.length)]); return; } }
+    const schance = classicOpts.alwaysSonic ? 0.3 : CONFIG.sonicChance;
+    if (!sonicActive && Math.random() < schance) { spawnSonic(); return; }
+    if (!dragonActive && Math.random() < CONFIG.dragonChance && downHoles().length >= 3) { popDragon(); return; }
+    const down = downHoles(); if (!down.length) return; const hole = down[Math.floor(Math.random() * down.length)];
+    const unlock = classicOpts.alwaysBombs ? 0 : CONFIG.bombUnlock; const bch = classicOpts.alwaysBombs ? 0.5 : bombChance();
+    if (points >= unlock && Math.random() < bch) popBomb(hole); else popHog(hole);
+  }
+  function nextDelay() { let base = CONFIG.delaySlow - speedT() * (CONFIG.delaySlow - CONFIG.delayFast); if (inEndRush()) base *= 0.4; if (classicOpts.hard) base *= 0.6; return base + Math.random() * base * 0.35; }
+  function schedulePops() { if (!picking) { popSomething(); if (inEndRush()) { popSomething(); popSomething(); } } popId = setTimeout(schedulePops, nextDelay()); }
+  // ---------- ticking clock + spoken 5-4-3-2-1-0 countdown ----------
+  let audioCtx = null, tickSoundId = null;
+  function ensureAudio() { try { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch (e) {} }
+  function curTimeLeft() { if (mode === 'classic') return timeLeft; if (mode === 'most') return daily ? daily.time : 99; if (mode === 'versus') return vs ? vs.time : 99; return 99; }
+  function tickTimedMode() { return mode === 'classic' || mode === 'most' || mode === 'versus'; }
+  function tickInterval() { const t = curTimeLeft(); if (t > 30) return 1000; if (t > 10) return 500; if (t > 5) return 230; return 130; }  // faster as time runs out
+  function playTick() { if (!audioCtx) return; const t0 = audioCtx.currentTime, o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    const urgent = curTimeLeft() <= 10; o.type = 'square'; o.frequency.value = urgent ? 1500 : 900;
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(urgent ? 0.32 : 0.2, t0 + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.06);
+    o.connect(g); g.connect(audioCtx.destination); o.start(t0); o.stop(t0 + 0.07); }
+  function scheduleTick() { if (!running || !tickTimedMode()) { tickSoundId = null; return; }
+    if (!picking && freezeTicks === 0) playTick(); tickSoundId = setTimeout(scheduleTick, tickInterval()); }
+  function startTicking() { stopTicking(); ensureAudio(); scheduleTick(); }
+  function stopTicking() { if (tickSoundId) { clearTimeout(tickSoundId); tickSoundId = null; } }
+  function announceCount(n) { if (n < 0 || n > 5) return;
+    bigCount.textContent = n; bigCount.classList.remove('hidden', 'pop'); void bigCount.offsetWidth; bigCount.classList.add('pop');
+    setTimeout(() => bigCount.classList.add('hidden'), 850);
+    try { const u = new SpeechSynthesisUtterance(String(n)); u.rate = 1.35; u.volume = 1; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); } catch (e) {} }
+  function tick() { if (picking) return; if (freezeTicks > 0) { freezeTicks--; if (freezeTicks === 0) timerPill.classList.remove('frozen'); return; }
+    timeLeft--;
+    if (timeLeft >= 0 && timeLeft <= 5) announceCount(timeLeft);
+    if (timeLeft === 15 && powerOn('panic15') && !panicUsed) { panicUsed = true; points += 5; flash('😰 +5 pts!', 'gold'); }
+    if (timeLeft <= 0) { if (powerOn('overtime') && overtimeUsed < 2) { overtimeUsed++; timeLeft = 5; flash('⏳ +5s overtime!', 'gold'); updateHud(); return; } timeLeft = 0; updateHud(); endGame(); return; }
+    updateHud(); }
 
-    // --- game flow ---
-    function startGame() {
-      buildBoard();
-      timeLeft = START_TIME;
-      score = 0;
-      wrongStreak = 0;
-      running = true;
-      paused = false;
-      bombModal.classList.remove("show");
-      bestEl.textContent = loadHigh();
-      type = new Array(HOLES).fill(null);
-      up = new Array(HOLES).fill(false);
-      hideTimers = new Array(HOLES).fill(null);
-      dragon = { active: false, heads: [], remaining: 0, timer: null };
-      sonic = { active: false, index: -1, moveTimer: null, lifeTimer: null };
-      sonicsCaught = 0;
-      choiceHandler = null;
-      updateStats();
-      statusEl.textContent = "Go! 🦔🐉";
-      startBtn.textContent = "Restart";
-      clearTimeout(spawnTimer);
-      clearTimeout(dragonTimer);
-      clearTimeout(bombTimer);
-      clearTimeout(sonicTimer);
-      clearInterval(countdownTimer);
-      scheduleHedgehog();
-      scheduleDragon();
-      scheduleBomb();
-      scheduleSonic();
-      countdownTimer = setInterval(tick, 1000);
-    }
+  function resetClassic() { clearSonic(); endBoss(); keyActive = false; shedActive = false; pinataActive = false; houseActive = false; mansionActive = false; if (helperId) { clearInterval(helperId); helperId = null; }
+    holes.forEach(h => { clearTimeout(h.timeout); if (h.group) clearTimeout(h.group.timeout); h.up = false; h.type = null; h.group = null; h.headDone = false; h.sticky = false;
+      if (!h.rock) { h.el.classList.remove('up', 'bonked', 'dragonhole', 'sonichole', 'keyhole', 'stickyhole', 'sheded'); h.el.innerHTML = ''; } });
+    dragonActive = false; sonicActive = false; sonic.hole = null; }
+  // Whenever the player adds something new (chest unlock / store buy), reset score & board.
+  function resetOnAdd(label) {
+    clearInterval(countdownId); clearTimeout(popId); stopTicking(); running = false; picking = false;
+    points = 0; missStreak = 0; freezeTicks = 0;
+    resetClassic(); updateHud();
+    flash('🔄 Added ' + (label || 'something new') + ' — score & board reset!', 'gold'); }
+  function startGame(opts) {
+    classicOpts = Object.assign({ cols: CONFIG.cols, mountain: false, alwaysBombs: false, alwaysSonic: false, hard: false, bossesAlways: false }, opts || {});
+    mode = 'classic'; buildGrid(classicOpts.cols); if (classicOpts.mountain) applyMountain(); setHudLabels(); resetClassic();
+    timeLeft = CONFIG.startTime + (powerOn('extraTime') ? 10 : 0) + (powerOn('startMinute') ? 60 : 0); bombShieldUsed = false; overtimeUsed = 0; panicUsed = false;
+    points = 0; missStreak = 0; freezeTicks = 0; bombChoiceKind = null; sonicChoiceKind = null;
+    caughtSonics = 0; bossCount = 0; nextBossAt = classicOpts.bossesAlways ? 0 : CONFIG.bossEvery; bossPending = false; picking = false; running = true;
+    bombChoice.classList.add('hidden'); sonicChoice.classList.add('hidden'); timerPill.classList.remove('frozen');
+    overlay.classList.add('hidden'); updateHud(); updateMoneyHud(); setHat(); dailyLogin(); quitBtn.classList.remove('hidden');
+    resetRoundKeys(); renderRoundKeys(); roundKeysEl.classList.remove('hidden');
+    if (classicOpts.alwaysSonic) spawnSonic();
+    schedulePops(); countdownId = setInterval(tick, 1000); startTicking();
+  }
+  function endGame() { if (!running) return; running = false; picking = false; stopTicking();
+    bombChoice.classList.add('hidden'); sonicChoice.classList.add('hidden'); clearInterval(countdownId); clearTimeout(popId); resetClassic(); timerPill.classList.remove('frozen');
+    let made = false; if (points > 0) made = tryRecord(CLASSIC_KEY, points, false, 5);
+    showOverlay('Time! ⏱', 'You scored <b>' + points + '</b> point' + (points === 1 ? '' : 's') + ' and reached <b>speed ' + speedLevel() + '/' + CONFIG.speedMax + '</b>!' + (made ? '<br><b style="color:#ffd24a">🏆 New high score!</b>' : ''), 'classic'); }
 
-    function endGame() {
-      running = false;
-      clearTimeout(spawnTimer);
-      clearTimeout(dragonTimer);
-      clearTimeout(bombTimer);
-      clearTimeout(sonicTimer);
-      clearInterval(countdownTimer);
-      if (dragon.timer) clearTimeout(dragon.timer);
-      if (sonic.moveTimer) clearInterval(sonic.moveTimer);
-      if (sonic.lifeTimer) clearTimeout(sonic.lifeTimer);
-      for (let i = 0; i < HOLES; i++) popDown(i);
-      dragon = { active: false, heads: [], remaining: 0, timer: null };
-      timeLeft = 0;
-      updateStats();
-      const best = loadHigh();
-      if (score > best) {
-        localStorage.setItem(HS_PREFIX + comboKey(), score);
-        bestEl.textContent = score;
-        statusEl.textContent = "⏰ Time's up! 🏆 New high score: " + score + " points!";
-      } else {
-        statusEl.textContent = "⏰ Time's up! Final score: " + score + " (best: " + best + ").";
-      }
-      pushRecord("records-hedgehog", { score: score, mode: comboLabel(), date: Date.now() });
-    }
+  // ================= DAILY =================
+  function makeRng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function seedDaily() { const d = new Date(); dailyRng = makeRng(d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate()); }
+  function dailyRand() { return dailyRng(); }
+  function randomEmpty() { const d = downHoles(); return d.length ? d[Math.floor(dailyRand() * d.length)] : null; }
+  function dailyHopMs(type) { if (type === 'hog') return CONFIG.dailyHogHop + dailyRand() * 300;
+    const c = Math.min(daily.caught, CONFIG.dailyHopCap); return CONFIG.dailyHopSlow - (c / CONFIG.dailyHopCap) * (CONFIG.dailyHopSlow - CONFIG.dailyHopFast) + dailyRand() * 150; }
+  function dailyPlace(hole, type) { if (!hole) return; hole.up = true; hole.type = type; hole.el.classList.remove('bonked');
+    if (type === 'sonic') { hole.el.classList.add('sonichole'); hole.el.innerHTML = '<div class="critter sonic">🦔</div>'; } else hole.el.innerHTML = '<div class="critter hog">🦔</div>';
+    raiseUp(hole); hole.timeout = setTimeout(() => dailyHop(hole), dailyHopMs(type)); }
+  function dailyVacate(hole) { clearTimeout(hole.timeout); hole.up = false; hole.type = null; hole.el.classList.remove('up', 'sonichole'); hole.el.innerHTML = ''; }
+  function dailyHop(hole) { const type = hole.type; let ch = neighborsOf(hole); if (!ch.length) ch = downHoles();
+    if (ch.length) { dailyVacate(hole); dailyPlace(ch[Math.floor(dailyRand() * ch.length)], type); } else hole.timeout = setTimeout(() => dailyHop(hole), dailyHopMs(type)); }
+  function catchDailySonic(hole, x, y) { dailyVacate(hole); daily.caught++; floatText('🦔 +1', x, y, 'frost'); if (unlocks.emerald) addMoney(CONFIG.emeraldSonicBonus); dailyPlace(randomEmpty(), 'sonic'); updateHud(); if (mode === 'speed' && daily.caught >= CONFIG.dailySpeedTarget) endDaily(true); }
+  function dailyStrike(hole, x, y) { dailyVacate(hole); daily.strikes++; floatText('❌', x, y, 'bad'); dailyPlace(randomEmpty(), 'hog'); updateHud(); if (daily.strikes >= CONFIG.dailyStrikes) endDaily(false); }
+  function clearDaily() { holes.forEach(h => { clearTimeout(h.timeout); h.up = false; h.type = null; h.el.classList.remove('up', 'sonichole', 'bonked'); h.el.innerHTML = ''; }); }
+  function startDaily(kind) { mode = kind; buildGrid(CONFIG.dailyCols); setHudLabels(); clearDaily(); seedDaily();
+    daily = { caught: 0, strikes: 0, time: CONFIG.dailyTime, startMs: Date.now() }; picking = false; running = true; overlay.classList.add('hidden'); updateHud(); dailyLogin(); quitBtn.classList.remove('hidden'); roundKeysEl.classList.add('hidden');
+    for (let i = 0; i < CONFIG.dailySonicCount; i++) dailyPlace(randomEmpty(), 'sonic');
+    for (let i = 0; i < CONFIG.dailyHogCount; i++) dailyPlace(randomEmpty(), 'hog');
+    if (kind === 'most') { startTicking(); dailyClockId = setInterval(() => { daily.time--; if (daily.time >= 0 && daily.time <= 5) announceCount(daily.time); updateHud(); if (daily.time <= 0) endDaily(true); }, 1000); }
+    else { daily.startMs = Date.now(); dailyClockId = setInterval(updateHud, 100); } }
+  function endDaily(success) { if (!running) return; running = false; stopTicking(); clearInterval(dailyClockId); clearDaily(); let made = false;
+    if (mode === 'most') { const score = daily.caught; if (score > 0) made = tryRecord(dailyKey('most'), score, false, 50);
+      showOverlay(daily.strikes >= CONFIG.dailyStrikes ? '3 Hedgehogs! 💥' : 'Time! ⏱', 'You caught <b>' + score + '</b> sonic' + (score === 1 ? '' : 's') + ' today.' + (made ? '<br><b style="color:#ffd24a">🏆 New daily record!</b>' : ''), 'most'); }
+    else { if (success) { const t = Math.round((Date.now() - daily.startMs) / 100) / 10; made = tryRecord(dailyKey('speed'), t, true, 50);
+      showOverlay('Speedrun! ⚡', 'You caught 10 sonics in <b>' + t.toFixed(1) + 's</b>!' + (made ? '<br><b style="color:#ffd24a">🏆 New daily record!</b>' : ''), 'speed'); }
+      else showOverlay('Run Failed 💥', 'You hit 3 hedgehogs — no record. Reach <b>10 sonics</b> cleanly!', 'speed'); } }
 
-    // --- hammer cursor ---
-    document.addEventListener("mousemove", e => {
-      hammerEl.style.display = "block";
-      hammerEl.style.left = e.clientX + "px";
-      hammerEl.style.top = e.clientY + "px";
-    });
-    document.addEventListener("mousedown", () => {
-      hammerEl.classList.add("whack");
-      setTimeout(() => hammerEl.classList.remove("whack"), 110);
-    });
+  // ================= VERSUS (local 2P / Vs CPU) =================
+  const keysDown = {};
+  function vsPlace(hole, type, ms) { hole.up = true; hole.type = type; hole.el.classList.remove('bonked', 'sonichole');
+    if (type === 'sonic') hole.el.classList.add('sonichole');
+    hole.el.innerHTML = '<div class="critter ' + (type === 'bomb' ? 'bomb">💣' : type === 'sonic' ? 'sonic">🦔' : 'hog">🦔') + '</div>';
+    raiseUp(hole); hole.timeout = setTimeout(() => { hole.up = false; hole.el.classList.remove('up', 'sonichole'); }, ms * upMul()); }
+  function vsKeyTiers() { const t = ['key'];                               // rare/gold/diamond only once they appear in classic
+    if ((unlocks.keysEarned || 0) >= CONFIG.rareKeyGate || unlocks.rareUnlocked) t.push('rareKey');
+    if (unlocks.goldUnlocked) t.push('goldKey'); if (unlocks.diamondUnlocked) t.push('diamondKey'); return t; }
+  function vsPlaceKey(hole, tier, triple) { hole.up = true; hole.type = tier; hole.keyTriple = !!triple;
+    hole.el.classList.remove('bonked', 'sonichole'); hole.el.classList.add('keyhole'); hole.el.innerHTML = keyMarkup(tier, triple);
+    raiseUp(hole); hole.timeout = setTimeout(() => { hole.up = false; hole.el.classList.remove('up', 'keyhole'); }, 1700 * upMul()); }
+  function vsPop() {
+    if (holes.filter(h => h.up).length >= 5) return;
+    const d = downHoles(); if (!d.length) return; const hole = d[Math.floor(Math.random() * d.length)];
+    if (Math.random() < CONFIG.vsKeyChance * (powerOn('keyMagnet') ? 2 : 1) * (powerOn('keysLessRare') ? 1.5 : 1)) { const tiers = vsKeyTiers(); const tier = tiers[Math.floor(Math.random() * tiers.length)];
+      vsPlaceKey(hole, tier, keyIsTriple(tier)); return; }
+    const r = Math.random(); if (r < 0.15) vsPlace(hole, 'bomb', 1500); else if (r < 0.40) vsPlace(hole, 'sonic', 1500); else vsPlace(hole, 'hog', 1600);
+  }
+  function vsSchedule() { vsPop(); vs.popId = setTimeout(vsSchedule, 460 + Math.random() * 380); }
+  function swing2() { hammer2.classList.add('swing'); setTimeout(() => hammer2.classList.remove('swing'), 120); }
+  function vsWhack(x, y, who) {
+    const el = document.elementFromPoint(x, y); const holeEl = el && el.closest ? el.closest('.hole') : null;
+    if (who === 'p2') swing2();
+    if (!holeEl) return; const hole = holes.find(h => h.el === holeEl); if (!hole || !hole.up) return;
+    const t = hole.type; const keyed = isKeyType(t);
+    let pts; if (t === 'hog') pts = 1; else if (t === 'sonic') pts = 2; else if (t === 'bomb') pts = -1;
+    else if (keyed) pts = KEY_TIERS[t].vsPts * (hole.keyTriple ? 3 : 1); else return;   // keys score by tier in versus
+    if (keyed) { const info = KEY_TIERS[t], n = hole.keyTriple ? 3 : 1;                 // whoever whacks it, YOU keep the key
+      unlocks[info.bal] = (unlocks[info.bal] || 0) + n; if (t === 'key') unlocks.keysEarned = (unlocks.keysEarned || 0) + n;
+      markKeyGotten(t); addRoundKey(t, n); saveUnlocks(); floatText(info.glyph + ' +' + n + ' kept!', x, y - 26, 'gold'); }
+    if (t === 'bomb' && who === 'p1') {                        // P1's bomb powers apply in versus
+      if (powerOn('bombShield') && !vs.bombShieldUsed) { vs.bombShieldUsed = true; pts = 0; floatText('🛡️ shielded!', x, y - 22, 'good'); }
+      else if (powerOn('bombHalf')) pts = 0; }
+    if (who === 'p1') vs.p1 = Math.max(0, vs.p1 + pts); else vs.p2 = Math.max(0, vs.p2 + pts);
+    hole.el.classList.remove('sonichole', 'keyhole'); bonkDown(hole); hole.type = null; hole.keyTriple = false;
+    floatText((pts >= 0 ? '+' : '') + pts, x, y, pts >= 0 ? 'good' : 'bad');
+    if (who === 'p1' && t === 'hog') vsHogBonus(hole, x, y);   // P1's equipped special hammer effects
+    updateHud();
+  }
+  function vsHogBonus(hole, x, y) {                            // special-hammer effects in Versus / 2-Player
+    if (isBetter('time')) { vs.time += 1; floatText('+1s', x, y - 22, 'good'); }
+    if (isBetter('gold')) addMoney(5);
+    if (isBetter('diamond')) addMoney(10);
+    if (isBetter('star')) { vs.p1 += 2; floatText('+2', x, y - 22, 'good'); }
+    if (isBetter('emerald')) { addMoney(50); vs.p1 += 3; floatText('💚 +3', x, y - 22, 'good'); }
+    if (isBetter('aoe') || isBetter('rocket')) {
+      const i = hole.idx, c = i % gridCols, r = Math.floor(i / gridCols), sides = [];
+      if (c > 0) sides.push(holes[i - 1]); if (c < gridCols - 1) sides.push(holes[i + 1]);
+      if (isBetter('rocket')) { if (r > 0) sides.push(holes[i - gridCols]); if (r < gridCols - 1) sides.push(holes[i + gridCols]); }
+      sides.forEach(n => { if (n && n.up && n.type === 'hog') { vs.p1 += 1; n.el.classList.remove('sonichole'); bonkDown(n); n.type = null;
+        const rr = n.el.getBoundingClientRect(); floatText('+1', rr.left + rr.width / 2, rr.top + rr.height / 2, 'good'); } });
+    }
+  }
+  function cpuStep() {
+    if (!vs.cpuTarget || !vs.cpuTarget.up) {
+      const ups = holes.filter(h => h.up && h.type !== 'bomb');
+      if (ups.length) { ups.sort((a, b) => (b.type === 'sonic' ? 1 : 0) - (a.type === 'sonic' ? 1 : 0)); vs.cpuTarget = ups[Math.floor(Math.random() * Math.min(ups.length, 3))]; }
+      else vs.cpuTarget = null;
+    }
+    if (vs.cpuTarget) {
+      const rect = vs.cpuTarget.el.getBoundingClientRect(); const tx = rect.left + rect.width / 2, ty = rect.top + rect.height / 2;
+      const dx = tx - vs.p2x, dy = ty - vs.p2y, dist = Math.hypot(dx, dy) || 1;
+      if (dist > vs.cpuSpeed) { vs.p2x += dx / dist * vs.cpuSpeed; vs.p2y += dy / dist * vs.cpuSpeed; }
+      else { vs.p2x = tx; vs.p2y = ty; if (Date.now() > vs.cpuCooldown) { vsWhack(tx, ty, 'p2'); vs.cpuCooldown = Date.now() + vs.cpuReact; vs.cpuTarget = null; } }
+    }
+  }
+  function vsFrame() {
+    if (mode !== 'versus' || !running) return;
+    if (vs.isCpu) cpuStep();
+    else { const sp = 8; if (keysDown['w']) vs.p2y -= sp; if (keysDown['s']) vs.p2y += sp; if (keysDown['a']) vs.p2x -= sp; if (keysDown['d']) vs.p2x += sp; }
+    vs.p2x = Math.max(8, Math.min(window.innerWidth - 8, vs.p2x)); vs.p2y = Math.max(8, Math.min(window.innerHeight - 8, vs.p2y));
+    hammer2.style.left = vs.p2x + 'px'; hammer2.style.top = vs.p2y + 'px';
+    vs.rafId = requestAnimationFrame(vsFrame);
+  }
+  function startVersus(isCpu) {
+    vs = { time: CONFIG.startTime + (powerOn('extraTime') ? 10 : 0) + (powerOn('startMinute') ? 60 : 0), p1: 0, p2: 0, isCpu: isCpu, p2x: window.innerWidth * 0.5, p2y: window.innerHeight * 0.62,
+      cpuTarget: null, cpuCooldown: 0, cpuReact: 280, cpuSpeed: 6, rafId: null, popId: null, clockId: null, bombShieldUsed: false };
+    mode = 'versus'; buildGrid(CONFIG.cols); setHudLabels();
+    holes.forEach(h => { clearTimeout(h.timeout); h.up = false; h.type = null; h.el.className = 'hole'; h.el.innerHTML = ''; });
+    running = true; picking = false; overlay.classList.add('hidden'); hammer2.classList.remove('hidden'); updateHud(); dailyLogin(); quitBtn.classList.remove('hidden');
+    resetRoundKeys(); renderRoundKeys(); roundKeysEl.classList.remove('hidden');
+    startTicking(); vsSchedule(); vs.clockId = setInterval(() => { vs.time--; if (vs.time >= 0 && vs.time <= 5) announceCount(vs.time); updateHud(); if (vs.time <= 0) endVersus(); }, 1000);
+    vs.rafId = requestAnimationFrame(vsFrame);
+  }
+  function endVersus() {
+    if (!running) return; running = false; stopTicking(); clearInterval(vs.clockId); clearTimeout(vs.popId); cancelAnimationFrame(vs.rafId);
+    holes.forEach(h => { clearTimeout(h.timeout); h.up = false; h.el.className = 'hole'; h.el.innerHTML = ''; });
+    hammer2.classList.add('hidden');
+    const p2name = vs.isCpu ? 'CPU' : 'P2'; let title;
+    if (vs.p1 > vs.p2) title = '🏆 Player 1 wins!'; else if (vs.p2 > vs.p1) title = vs.isCpu ? '🤖 CPU wins!' : '🏆 Player 2 wins!'; else title = "🤝 It's a tie!";
+    showOverlay(title, 'P1 (mouse): <b>' + vs.p1 + '</b> &nbsp;&nbsp; ' + p2name + ': <b>' + vs.p2 + '</b><br><small>🦔=+1 · blue Sonic=+2 · 💣=−1</small>', 'classic');
+  }
+  window.addEventListener('keydown', e => {
+    if (mode !== 'versus' || !running || vs.isCpu) return;
+    const k = e.key.toLowerCase();
+    if (k === 'w' || k === 'a' || k === 's' || k === 'd' || k === ' ') e.preventDefault();
+    if (k === ' ' && !keysDown[' ']) vsWhack(vs.p2x, vs.p2y, 'p2');
+    keysDown[k] = true;
+  });
+  window.addEventListener('keyup', e => { keysDown[e.key.toLowerCase()] = false; });
 
-    // --- mode buttons: pick a length AND a starting speed ---
-    const timeModesEl = document.getElementById("time-modes");
-    const speedModesEl = document.getElementById("speed-modes");
-    function buildModeButtons() {
-      timeModesEl.innerHTML = "";
-      TIME_ORDER.forEach(key => {
-        const b = document.createElement("button");
-        b.className = "mode-btn" + (key === timeKey ? " active" : "");
-        b.textContent = TIMES[key].label;
-        b.addEventListener("click", () => setTime(key));
-        timeModesEl.appendChild(b);
-      });
-      speedModesEl.innerHTML = "";
-      SPEED_ORDER.forEach(key => {
-        const b = document.createElement("button");
-        b.className = "mode-btn" + (key === speedKey ? " active" : "");
-        b.textContent = SPEEDS[key].label;
-        b.addEventListener("click", () => setSpeed(key));
-        speedModesEl.appendChild(b);
-      });
+  // ================= TREASURE CHEST =================
+  function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+  function pickCycle(pool, count, offset) { const out = []; for (let i = 0; i < count; i++) out.push(pool[(offset + i) % pool.length]); return out; }
+  function newBoard() {   // exactly 2 normal-key boards, then they cycle (1→2→1→2…)
+    const num = unlocks.board ? (unlocks.board.num % 2) + 1 : 1; const r = [];
+    if (num === 1) {   // board 1 = hammers / powers / grids / modes
+      pickCycle(HAMMER_POOL, 5, 0).forEach(h => r.push({ kind: 'hammer', val: h, icon: h, label: 'New hammer ' + h }));
+      for (let i = 0; i < 7; i++) r.push({ kind: 'nothing', icon: '😶', label: 'Nothing…' });
+      pickCycle(POWER_POOL, 3, 0).forEach(p => r.push({ kind: 'power', val: p.id, icon: '⭐', label: 'POWER: ' + p.label }));
+      GRID_REWARDS.forEach(g => r.push(Object.assign({}, g)));
+      MODE_REWARDS.forEach(m => r.push(Object.assign({}, m)));
+    } else {           // board 2 = money / shed / would-you-rather / better-hammers
+      pickCycle(HAMMER_POOL, 5, 5).forEach(h => r.push({ kind: 'hammer', val: h, icon: h, label: 'New hammer ' + h }));
+      r.push({ kind: 'shed', icon: '🛖', label: 'SHED! Sheds now appear in game (+$100)' });
+      for (let i = 0; i < 6; i++) r.push({ kind: 'money', amount: 100, icon: '💵', label: '$100' });
+      for (let i = 0; i < 3; i++) r.push({ kind: 'wyr', pair: i, icon: '🤔', label: 'Would-you-rather power' });
+      for (let i = 0; i < 7; i++) r.push({ kind: 'nothing', icon: '😶', label: 'Nothing…' });
+      BETTER_HAMMERS.forEach(b => r.push({ kind: 'betterHammer', val: b.id, icon: SPECIAL_HAMMER[b.id], label: 'BETTER HAMMER: ' + b.label }));
     }
-    function refreshPreview() {
-      bestEl.textContent = loadHigh();                                  // this combo's high score
-      timeEl.textContent = formatTime(START_TIME);
-      speedEl.textContent = SPEEDS[speedKey].startSpeed.toFixed(1) + "×";
-    }
-    function setTime(key) {
-      if (running) return;   // finish the current game before switching
-      timeKey = key;
-      START_TIME = TIMES[key].time;
-      buildModeButtons();
-      refreshPreview();
-    }
-    function setSpeed(key) {
-      if (running) return;
-      speedKey = key;
-      buildModeButtons();
-      refreshPreview();
-    }
+    return { rewards: shuffle(r), revealed: new Array(25).fill(false), num };
+  }
+  function usefulPool() {   // every not-yet-owned beneficial reward — never a duplicate of what you already have
+    const pool = [];
+    HAMMER_POOL.filter(h => !unlocks.hammers.includes(h)).forEach(h => pool.push({ kind: 'hammer', val: h, icon: h, label: 'Hammer ' + h }));
+    BETTER_HAMMERS.filter(b => !unlocks.hammers.includes(b.id)).forEach(b => pool.push({ kind: 'betterHammer', val: b.id, icon: SPECIAL_HAMMER[b.id], label: 'BETTER HAMMER: ' + b.label }));
+    STORE_HAMMERS.filter(s => !unlocks.hammers.includes(s.id)).forEach(s => pool.push({ kind: 'betterHammer', val: s.id, icon: s.glyph, label: s.label }));
+    POWER_POOL.filter(p => !unlocks.powers[p.id]).forEach(p => pool.push({ kind: 'power', val: p.id, icon: '⭐', label: 'POWER: ' + p.label }));
+    GRID_REWARDS.filter(g => !unlocks.grids[g.val]).forEach(g => pool.push(Object.assign({}, g)));
+    MODE_REWARDS.filter(m => m.val !== 'newChests' && !unlocks.modes[m.val]).forEach(m => pool.push(Object.assign({}, m)));
+    HAT_POOL.filter(h => !unlocks.hats.includes(h)).forEach(h => pool.push({ kind: 'hat', val: h, icon: h, label: 'Hat ' + h }));
+    if (!unlocks.shedsUnlocked) pool.push({ kind: 'shed', icon: '🛖', label: 'SHED! Sheds appear in game (+$100)' });
+    if (!unlocks.store.pinata) pool.push({ kind: 'storePinata', icon: '💰', label: 'Money Piñatas appear in game' });
+    return pool;
+  }
+  function newRareBoard() {   // 50 tiles — all useful, never something you already own
+    const num = unlocks.rareBoard ? unlocks.rareBoard.num + 1 : 1;
+    let r = shuffle(usefulPool());
+    const fillers = [{ kind: 'money', amount: 250, icon: '💵', label: '$250' }, { kind: 'keyReward', icon: '🗝️', label: '+1 key' }];
+    let fi = 0; while (r.length < 50) { r.push(Object.assign({}, fillers[fi % fillers.length])); fi++; }
+    r = r.slice(0, 50);
+    return { rewards: shuffle(r), revealed: new Array(50).fill(false), num };
+  }
+  function newGoldBoard() {   // 25 tiles — all good
+    const r = [];
+    for (let i = 0; i < 6; i++) r.push({ kind: 'money', amount: 300, icon: '💵', label: '$300' });
+    for (let i = 0; i < 4; i++) r.push({ kind: 'rareKey', icon: '🔑', label: '+1 rare key' });
+    for (let i = 0; i < 3; i++) r.push({ kind: 'keyReward', icon: '🗝️', label: '+1 key' });
+    BETTER_HAMMERS.forEach(b => r.push({ kind: 'betterHammer', val: b.id, icon: SPECIAL_HAMMER[b.id], label: 'BETTER HAMMER: ' + b.label }));
+    pickCycle(POWER_POOL, 4, (unlocks.goldBoard ? unlocks.goldBoard.num : 0) * 4).forEach(p => r.push({ kind: 'power', val: p.id, icon: '⭐', label: 'POWER: ' + p.label }));
+    for (let i = 0; i < 3; i++) r.push({ kind: 'hat', val: HAT_POOL[i % HAT_POOL.length], icon: HAT_POOL[i % HAT_POOL.length], label: 'Hat ' + HAT_POOL[i % HAT_POOL.length] });
+    r.push({ kind: 'goldKey', amount: 2, icon: '🔑', label: '+2 gold keys' });
+    r.push({ kind: 'shed', icon: '🛖', label: 'SHED! Sheds appear in game (+$100)' });
+    const num = unlocks.goldBoard ? unlocks.goldBoard.num + 1 : 1;
+    return { rewards: shuffle(r), revealed: new Array(25).fill(false), num };
+  }
+  function newDiamondBoard() {   // 9 tiles — all good; one is the House
+    const r = [];
+    r.push({ kind: 'house', icon: '🏠', label: 'HOUSE! Houses appear in game (+$' + CONFIG.houseWhack + ' per whack!)' });
+    r.push({ kind: 'betterHammer', val: 'diamond', icon: '💎', label: '💎 Diamond Hammer — earn $10 per hedgehog' });
+    r.push({ kind: 'betterHammer', val: 'rocket', icon: '🚀', label: '🚀 Rocket Hammer — splash hits all 4 side holes' });
+    r.push({ kind: 'betterHammer', val: 'star', icon: '🌟', label: '🌟 Star Hammer — +2 points per hedgehog' });
+    r.push({ kind: 'money', amount: 1000, icon: '💰', label: '$1000' });
+    r.push({ kind: 'money', amount: 1000, icon: '💰', label: '$1000' });
+    r.push({ kind: 'goldKey', amount: 5, icon: '🔑', label: '+5 gold keys' });
+    r.push({ kind: 'diamondKey', amount: 2, icon: '🔑', label: '+2 diamond keys' });
+    const p = POWER_POOL[(unlocks.diamondBoard ? unlocks.diamondBoard.num : 0) % POWER_POOL.length];
+    r.push({ kind: 'power', val: p.id, icon: '⭐', label: 'POWER: ' + p.label });
+    const num = unlocks.diamondBoard ? unlocks.diamondBoard.num + 1 : 1;
+    return { rewards: shuffle(r), revealed: new Array(9).fill(false), num };
+  }
+  const CHEST = {
+    normal:  { boardField: 'board',        keyField: 'keys',        cls: '',        make: newBoard,        ki: '🗝️' },
+    rare:    { boardField: 'rareBoard',    keyField: 'rareKeys',    cls: 'rare',    make: newRareBoard,    ki: '🔑' },
+    gold:    { boardField: 'goldBoard',    keyField: 'goldKeys',    cls: 'gold',    make: newGoldBoard,    ki: '🔑' },
+    diamond: { boardField: 'diamondBoard', keyField: 'diamondKeys', cls: 'diamond', make: newDiamondBoard, ki: '💎' }
+  };
+  function curBoard() { return unlocks[CHEST[chestKind].boardField]; }
+  function curKeys() { return unlocks[CHEST[chestKind].keyField] || 0; }
+  function spendKey() { unlocks[CHEST[chestKind].keyField]--; }
+  function makeBoard() { return CHEST[chestKind].make(); }
+  function setCurBoard(b) { unlocks[CHEST[chestKind].boardField] = b; }
+  function ensureBoard() { if (!curBoard() || !curBoard().rewards) { setCurBoard(makeBoard()); saveUnlocks(); } }
+  function showChest(kind) { chestKind = kind || 'normal'; ensureBoard(); renderChest(); overlay.classList.add('hidden'); chest.classList.remove('hidden'); }
+  function renderChest() {
+    const b = curBoard(); chestGrid.innerHTML = '';
+    chestGrid.classList.remove('rare', 'gold', 'diamond'); chest.classList.remove('rare', 'gold', 'diamond');
+    if (CHEST[chestKind].cls) { chestGrid.classList.add(CHEST[chestKind].cls); chest.classList.add(CHEST[chestKind].cls); }
+    b.rewards.forEach((rw, i) => { const btn = document.createElement('button'); btn.className = 'ctile';
+      if (b.revealed[i]) { btn.textContent = rw.icon; btn.classList.add('revealed'); btn.title = rw.label; }
+      else { btn.textContent = '❓'; btn.addEventListener('click', ev => { ev.stopPropagation(); openTile(i); }); }
+      chestGrid.appendChild(btn); });
+    const done = b.revealed.every(Boolean); const ki = CHEST[chestKind].ki;
+    const kindLabel = chestKind === 'normal' ? '' : (chestKind.toUpperCase() + ' ');
+    chestMsg.innerHTML = done ? ('Board #' + b.num + ' fully opened! 🎉 A fresh grid is ready…')
+      : (kindLabel + 'Board #' + b.num + ' · ' + ki + ' Keys: <b>' + curKeys() + '</b> · open a ❓ (1 key each)');
+    chestClose.classList.remove('hidden');
+  }
+  function gridsDone(kind) { const n = (unlocks.boardsDone && unlocks.boardsDone[kind]) || 0; return n >= (kind === 'normal' ? 2 : 1); }
+  function onGridComplete(kind) {                       // a chest board was fully opened
+    if (!unlocks.boardsDone) unlocks.boardsDone = { normal: 0, rare: 0, gold: 0, diamond: 0 };
+    unlocks.boardsDone[kind] = (unlocks.boardsDone[kind] || 0) + 1; saveUnlocks();
+    const need = kind === 'normal' ? 2 : 1;
+    if (unlocks.boardsDone[kind] === need) {            // just reached the threshold → unlock trading, go to Store
+      const better = { normal: '🔑 rare', rare: '🔑 gold', gold: '🔑 diamond', diamond: '💚 emerald' }[kind];
+      setTimeout(() => { chest.classList.add('hidden'); showStore(); flash('🔓 Grid complete! Trading for ' + better + ' keys is now unlocked!', 'gold'); }, 1000); }
+  }
+  function maybeRefreshBoard() { const b = curBoard(); if (b.revealed.every(Boolean)) { onGridComplete(chestKind); renderChest();
+    if (!gridsDone(chestKind)) setTimeout(() => { setCurBoard(makeBoard()); saveUnlocks(); renderChest(); }, 1100); } else renderChest(); }
+  function openTile(i) {
+    const b = curBoard(); if (b.revealed[i]) return;
+    if (curKeys() <= 0) { chestMsg.innerHTML = 'No keys! Beat a boss, find keys, or buy them in the store.'; return; }
+    const rw = b.rewards[i];
+    if (rw.kind === 'wyr') { spendKey(); b.revealed[i] = true; saveUnlocks(); renderChest(); openWyr(rw.pair); return; }
+    spendKey(); b.revealed[i] = true; applyReward(rw); saveUnlocks(); flash('Got: ' + rw.label, 'gold');
+    if (b.revealed.every(Boolean)) maybeRefreshBoard();
+    else { renderChest(); chestMsg.innerHTML = '🎁 That chest was: <b>' + rw.label + '</b> · ' + CHEST[chestKind].ki + ' ' + curKeys(); }
+  }
+  function openWyr(pair) { wyrPending = pair; const opts = WYR_PAIRS[pair]; wyrA.textContent = opts[0].label; wyrB.textContent = opts[1].label; wyrChoice.classList.remove('hidden'); }
+  function resolveWyr(which) { const choice = WYR_PAIRS[wyrPending][which]; unlocks.powers[choice.id] = true; unlocks.powersOn[choice.id] = true; saveUnlocks();
+    wyrChoice.classList.add('hidden'); flash('Power: ' + choice.label, 'gold'); maybeRefreshBoard(); }
+  wyrA.addEventListener('click', e => { e.stopPropagation(); resolveWyr(0); });
+  wyrB.addEventListener('click', e => { e.stopPropagation(); resolveWyr(1); });
+  // ---- store ----
+  function storeItems() { return [
+    { id: 'key', label: '🗝️ Key', cost: 200, has: () => false, buy: () => { unlocks.keys++; unlocks.keysEarned = (unlocks.keysEarned || 0) + 1; } },
+    { id: 'rareKey', label: '🔑 Rare Key (opens the rare chest)', cost: 1000, gate: () => gridsDone('normal'), has: () => false, buy: () => { unlocks.rareKeys++; markKeyGotten('rareKey'); } },
+    { id: 'unlockGold', label: '🔑 Unlock GOLD keys in the game', keyPay: 'rareKeys', keyCost: CONFIG.tierUnlockCost, payGlyph: '🔑', gate: () => gridsDone('rare'),
+      has: () => unlocks.goldUnlocked, buy: () => unlocks.goldUnlocked = true },
+    { id: 'unlockDiamond', label: '🔑 Unlock DIAMOND keys in the game', keyPay: 'goldKeys', keyCost: CONFIG.tierUnlockCost, gate: () => gridsDone('gold'), payGlyph: '🔑',
+      has: () => unlocks.diamondUnlocked, buy: () => unlocks.diamondUnlocked = true },
+    { id: 'tradeRare', label: '🔄 Trade 5 🗝️ keys → 1 🔑 rare key', keyPay: 'keys', keyCost: 5, payGlyph: '🗝️', gate: () => gridsDone('normal'), has: () => false, buy: () => { unlocks.rareKeys++; markKeyGotten('rareKey'); } },
+    { id: 'tradeGold', label: '🔄 Trade 5 🔑 rare → 1 🔑 gold key', keyPay: 'rareKeys', keyCost: 5, payGlyph: '🔑', gate: () => gridsDone('rare'), has: () => false, buy: () => { unlocks.goldKeys++; markKeyGotten('goldKey'); } },
+    { id: 'tradeDiamond', label: '🔄 Trade 5 🔑 gold → 1 🔑 diamond key', keyPay: 'goldKeys', keyCost: 5, payGlyph: '🔑', gate: () => gridsDone('gold'), has: () => false, buy: () => { unlocks.diamondKeys++; markKeyGotten('diamondKey'); } },
+    { id: 'emeraldKey', label: '💚 THE Emerald Key — WIN THE GAME! (mansion, emerald hammer, throne & more)', keyPay: 'diamondKeys', keyCost: CONFIG.emeraldTradeCost, payGlyph: '🔷', gate: () => gridsDone('diamond'), has: () => false, buy: grantEmerald },
+    { id: 'sell_key', sell: { bal: 'keys', glyph: '🗝️', amt: 10, name: 'key' }, has: () => false },
+    { id: 'sell_rareKey', sell: { bal: 'rareKeys', glyph: '🟢🔑', amt: 100, name: 'rare key' }, has: () => false },
+    { id: 'sell_goldKey', sell: { bal: 'goldKeys', glyph: '🟡🔑', amt: 1000, name: 'gold key' }, has: () => false },
+    { id: 'sell_diamondKey', sell: { bal: 'diamondKeys', glyph: '🔷🔑', amt: 10000, name: 'diamond key' }, has: () => false },
+    { id: 'sell_emerald', sell: { emerald: true, glyph: '💚', amt: 100000, name: 'THE emerald key' }, has: () => false },
+    { id: 'power', label: '⭐ Random Power', cost: 400, has: () => POWER_POOL.every(p => unlocks.powers[p.id]), buy: buyRandomPower },
+    { id: 'hammer', label: '🔨 Random Hammer', cost: 150, has: () => HAMMER_POOL.every(h => unlocks.hammers.includes(h)), buy: buyRandomHammer },
+    ...STORE_HAMMERS.map(sh => ({ id: 'sh_' + sh.id, label: sh.label, cost: sh.cost,
+      has: () => unlocks.hammers.includes(sh.id),
+      buy: () => { if (!unlocks.hammers.includes(sh.id)) unlocks.hammers.push(sh.id); unlocks.equipped = sh.id; setHammer(); } })),
+    { id: 'hat', label: '🎩 Random Hat', cost: 250, has: () => HAT_POOL.every(h => unlocks.hats.includes(h)), buy: buyRandomHat },
+    { id: 'sheds', label: '🛖 Unlock Sheds', cost: 350, has: () => unlocks.shedsUnlocked, buy: () => unlocks.shedsUnlocked = true },
+    { id: 'pinata', label: '💰 Money Piñatas (appear in game)', cost: 600, has: () => unlocks.store.pinata, buy: () => unlocks.store.pinata = true },
+    { id: 'gmountain', label: '⛰️ Mountain grid', cost: 300, has: () => unlocks.grids.mountain, buy: () => unlocks.grids.mountain = true },
+    { id: 'g4', label: '🔳 4×4 grid', cost: 250, has: () => unlocks.grids.g4, buy: () => unlocks.grids.g4 = true },
+    { id: 'g6', label: '🔲 6×6 grid', cost: 250, has: () => unlocks.grids.g6, buy: () => unlocks.grids.g6 = true },
+    { id: 'gbomb', label: '💣 Bomb Round grid', cost: 300, has: () => unlocks.grids.bombRound, buy: () => unlocks.grids.bombRound = true },
+    { id: 'gsonic', label: '🦔 Sonic Round grid', cost: 300, has: () => unlocks.grids.sonicRound, buy: () => unlocks.grids.sonicRound = true }
+  ]; }
+  function buyRandomPower() { const a = POWER_POOL.filter(p => !unlocks.powers[p.id]); if (a.length) { const p = a[Math.floor(Math.random() * a.length)]; unlocks.powers[p.id] = true; unlocks.powersOn[p.id] = true; } }
+  function buyRandomHammer() { const a = HAMMER_POOL.filter(h => !unlocks.hammers.includes(h)); if (a.length) { const h = a[Math.floor(Math.random() * a.length)]; unlocks.hammers.push(h); unlocks.equipped = h; setHammer(); } }
+  function buyRandomHat() { const a = HAT_POOL.filter(h => !unlocks.hats.includes(h)); if (a.length) { const h = a[Math.floor(Math.random() * a.length)]; unlocks.hats.push(h); unlocks.hat = h; setHat(); } }
+  function showStore() { renderStore(); overlay.classList.add('hidden'); storeEl.classList.remove('hidden'); }
+  function renderStore() { storeMoney.textContent = '💵 $' + (unlocks.money || 0) + '  ·  🔑 rare ' + (unlocks.rareKeys || 0) + '  ·  🔑 gold ' + (unlocks.goldKeys || 0);
+    storeListEl.innerHTML = storeItems().filter(it => !it.gate || it.gate()).map(it => {
+      if (it.sell) { const have = it.sell.emerald ? (unlocks.emerald || 0) : (unlocks[it.sell.bal] || 0);
+        if (have <= 0) return '';
+        return '<div class="strow"><span>' + it.sell.glyph + ' Sell 1 ' + it.sell.name + ' <small>(have ' + have + ')</small></span><button data-sell="' + it.id + '">Sell $' + it.sell.amt.toLocaleString() + '</button></div>'; }
+      const owned = it.has();
+      let price, afford;
+      if (it.keyPay) { afford = (unlocks[it.keyPay] || 0) >= it.keyCost; price = (it.payGlyph || '🔑') + '×' + it.keyCost; }
+      else { afford = (unlocks.money || 0) >= it.cost; price = '$' + it.cost; }
+      const btn = owned ? '<button disabled>Owned</button>' : '<button data-buy="' + it.id + '"' + (afford ? '' : ' disabled') + '>' + price + '</button>';
+      return '<div class="strow"><span>' + it.label + '</span>' + btn + '</div>'; }).join(''); }
+  function sellKey(sell) {
+    if (sell.emerald) { if ((unlocks.emerald || 0) <= 0) return; unlocks.emerald--;
+      unlocks.money = (unlocks.money || 0) + sell.amt;                                       // flat $100k, never doubled
+      updateWinBanner(); }   // you keep the throne, certificate, mansion, emerald bat & powers — only the key is sold
+    else { if ((unlocks[sell.bal] || 0) <= 0) return; unlocks[sell.bal]--; addMoney(sell.amt); }
+    saveUnlocks(); updateMoneyHud(); updateKeyTotals(); renderStore(); flash('💰 Sold ' + sell.name + ' for $' + sell.amt.toLocaleString() + '!', 'gold'); }
+  storeListEl.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation();
+    if (b.dataset.sell) { const s = storeItems().find(x => x.id === b.dataset.sell); if (s && s.sell) sellKey(s.sell); return; }
+    if (!b.dataset.buy) return;
+    const it = storeItems().find(x => x.id === b.dataset.buy); if (!it || it.has()) return;
+    if (it.keyPay) { if ((unlocks[it.keyPay] || 0) < it.keyCost) return; unlocks[it.keyPay] -= it.keyCost; }
+    else { if ((unlocks.money || 0) < it.cost) return; unlocks.money -= it.cost; }
+    it.buy(); saveUnlocks(); updateMoneyHud(); updateKeyTotals(); renderStore(); renderMenu(); resetOnAdd(it.label); });
+  storeClose.addEventListener('click', e => { e.stopPropagation(); storeEl.classList.add('hidden'); overlay.classList.remove('hidden'); renderMenu(); });
+  // ---- powers panel ----
+  function showPowers() { renderPowers(); overlay.classList.add('hidden'); powersEl.classList.remove('hidden'); }
+  function renderPowers() {
+    const wyrIds = new Set(); WYR_PAIRS.forEach(p => p.forEach(o => wyrIds.add(o.id)));
+    let html = '';
+    Object.keys(POWER_INFO).filter(k => unlocks.powers[k] && !wyrIds.has(k)).forEach(k => { const on = unlocks.powersOn[k] !== false;
+      html += '<div class="powrow"><span>⭐ ' + POWER_INFO[k] + '</span><button data-p="' + k + '" class="' + (on ? 'on' : 'off') + '">' + (on ? 'ON' : 'OFF') + '</button></div>'; });
+    WYR_PAIRS.forEach((pair, i) => { if (!unlocks.powers[pair[0].id] && !unlocks.powers[pair[1].id]) return;   // once earned, switch freely
+      const act = unlocks.powers[pair[0].id] ? 0 : 1;
+      html += '<div class="powrow wyrrow"><span>🤔 Would-you-rather <small>(tap to switch)</small></span><span class="wyrbtns">'
+        + '<button data-wyr="' + i + '" data-opt="0" class="' + (act === 0 ? 'on' : 'off') + '">' + pair[0].label + '</button>'
+        + '<button data-wyr="' + i + '" data-opt="1" class="' + (act === 1 ? 'on' : 'off') + '">' + pair[1].label + '</button></span></div>'; });
+    powersList.innerHTML = html || '<div style="opacity:.7">No powers yet — open chests to find them!</div>';
+  }
+  function switchWyr(i, opt) { const pair = WYR_PAIRS[i], chosen = pair[opt], other = pair[1 - opt];
+    unlocks.powers[chosen.id] = true; unlocks.powersOn[chosen.id] = true; unlocks.powers[other.id] = false; unlocks.powersOn[other.id] = false; saveUnlocks(); renderPowers(); }
+  powersList.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation();
+    if (b.dataset.wyr !== undefined) { switchWyr(+b.dataset.wyr, +b.dataset.opt); return; }
+    const k = b.dataset.p; const cur = unlocks.powersOn[k] !== false; unlocks.powersOn[k] = !cur; saveUnlocks(); renderPowers(); });
+  powersClose.addEventListener('click', e => { e.stopPropagation(); powersEl.classList.add('hidden'); overlay.classList.remove('hidden'); renderMenu(); });
+  function applyReward(rw) {
+    if (rw.kind === 'hammer') { if (!unlocks.hammers.includes(rw.val)) unlocks.hammers.push(rw.val); unlocks.equipped = rw.val; setHammer(); }
+    else if (rw.kind === 'betterHammer') { if (!unlocks.hammers.includes(rw.val)) unlocks.hammers.push(rw.val); unlocks.equipped = rw.val; setHammer(); }
+    else if (rw.kind === 'power') { unlocks.powers[rw.val] = true; unlocks.powersOn[rw.val] = true; }
+    else if (rw.kind === 'grid') unlocks.grids[rw.val] = true;
+    else if (rw.kind === 'mode') { if (rw.val === 'newChests') unlocks.keys++; else unlocks.modes[rw.val] = true; }
+    else if (rw.kind === 'money') addMoney(rw.amount);
+    else if (rw.kind === 'shed') { unlocks.shedsUnlocked = true; addMoney(100); }
+    else if (rw.kind === 'rareKey') { unlocks.rareKeys = (unlocks.rareKeys || 0) + (rw.amount || 1); markKeyGotten('rareKey'); }
+    else if (rw.kind === 'keyReward') { unlocks.keys += (rw.amount || 1); unlocks.keysEarned = (unlocks.keysEarned || 0) + (rw.amount || 1); }
+    else if (rw.kind === 'goldKey') { unlocks.goldKeys = (unlocks.goldKeys || 0) + (rw.amount || 1); markKeyGotten('goldKey'); }
+    else if (rw.kind === 'diamondKey') { unlocks.diamondKeys = (unlocks.diamondKeys || 0) + (rw.amount || 1); markKeyGotten('diamondKey'); }
+    else if (rw.kind === 'house') unlocks.houseUnlocked = true;
+    else if (rw.kind === 'storePinata') unlocks.store.pinata = true;
+    else if (rw.kind === 'hat') { if (!unlocks.hats.includes(rw.val)) unlocks.hats.push(rw.val); unlocks.hat = rw.val; setHat(); }
+    saveUnlocks();
+    if (['hammer', 'betterHammer', 'power', 'grid', 'mode', 'shed', 'hat', 'house', 'storePinata'].includes(rw.kind)) resetOnAdd(rw.label); }
+  chestClose.addEventListener('click', e => { e.stopPropagation(); chest.classList.add('hidden'); overlay.classList.remove('hidden'); renderMenu(); });
 
-    boardEl.addEventListener("click", onBoardClick);
-    startBtn.addEventListener("click", startGame);
-    choosePointsBtn.addEventListener("click", () => answerChoice("points"));
-    chooseSecondsBtn.addEventListener("click", () => answerChoice("seconds"));
+  // ================= MENU =================
+  function renderMenu() {
+    updateKeyTotals();
+    let h = ''; const g = unlocks.grids, m = unlocks.modes;
+    if (g.g4) h += '<button data-act="grid-g4">🔳 4×4</button>';
+    if (g.g6) h += '<button data-act="grid-g6">🔲 6×6</button>';
+    if (g.mountain) h += '<button data-act="grid-mountain">⛰️ Mountain</button>';
+    if (g.bombRound) h += '<button data-act="grid-bombRound">💣 Bomb Round</button>';
+    if (g.sonicRound) h += '<button data-act="grid-sonicRound">🦔 Sonic Round</button>';
+    if (m.hard) h += '<button data-act="mode-hard">🔥 Hard Mode</button>';
+    if (m.bossesAlways) h += '<button data-act="mode-bossesAlways">👁️ Bosses Always</button>';
+    if (m.twoPlayer) h += '<button data-act="mode-2p">👥 2 Player</button>';
+    if (m.vsCpu) h += '<button data-act="mode-vscpu">🤖 Vs CPU</button>';
+    unlockRow.innerHTML = h;
+    let gr = '<span>Hammer:</span> <button id="hammerBtn">' + hammerGlyph(unlocks.equipped) + '</button>';
+    if (!gridsDone('normal')) gr += ' <button id="chestBtn">🧰 Chest — 🗝️ ' + unlocks.keys + '</button>';
+    if ((unlocks.rareKeys > 0 || unlocks.rareBoard) && !gridsDone('rare')) gr += ' <button id="rareBtn">🟢🔑 Rare — ' + unlocks.rareKeys + '</button>';
+    if ((unlocks.goldUnlocked || unlocks.goldKeys > 0 || unlocks.goldBoard) && !gridsDone('gold')) gr += ' <button id="goldBtn">🟡🔑 Gold — ' + (unlocks.goldKeys || 0) + '</button>';
+    if ((unlocks.diamondUnlocked || unlocks.diamondKeys > 0 || unlocks.diamondBoard) && !gridsDone('diamond')) gr += ' <button id="diamondBtn">🔷🔑 Diamond — ' + (unlocks.diamondKeys || 0) + '</button>';
+    gr += ' <button id="powersBtn">⭐ Powers</button>';
+    gr += ' <button id="storeBtn">🛒 Store ($' + (unlocks.money || 0) + ')</button>';
+    if (unlocks.hats.length) gr += ' <button id="hatBtn">🎩 ' + (unlocks.hat || 'none') + '</button>';
+    gearRow.innerHTML = gr;
+    $('hammerBtn').addEventListener('click', e => { e.stopPropagation(); const i = unlocks.hammers.indexOf(unlocks.equipped);
+      unlocks.equipped = unlocks.hammers[(i + 1) % unlocks.hammers.length]; setHammer(); saveUnlocks(); renderMenu(); });
+    if ($('chestBtn')) $('chestBtn').addEventListener('click', e => { e.stopPropagation(); showChest('normal'); });
+    if ($('rareBtn')) $('rareBtn').addEventListener('click', e => { e.stopPropagation(); showChest('rare'); });
+    if ($('goldBtn')) $('goldBtn').addEventListener('click', e => { e.stopPropagation(); showChest('gold'); });
+    if ($('diamondBtn')) $('diamondBtn').addEventListener('click', e => { e.stopPropagation(); showChest('diamond'); });
+    $('powersBtn').addEventListener('click', e => { e.stopPropagation(); showPowers(); });
+    $('storeBtn').addEventListener('click', e => { e.stopPropagation(); showStore(); });
+    if ($('hatBtn')) $('hatBtn').addEventListener('click', e => { e.stopPropagation(); const opts = [null].concat(unlocks.hats);
+      const i = opts.indexOf(unlocks.hat); unlocks.hat = opts[(i + 1) % opts.length]; setHat(); saveUnlocks(); renderMenu(); });
+  }
+  unlockRow.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation();
+    const act = b.dataset.act;
+    if (act === 'grid-g4') startGame({ cols: 4 });
+    else if (act === 'grid-g6') startGame({ cols: 6 });
+    else if (act === 'grid-mountain') startGame({ mountain: true });
+    else if (act === 'grid-bombRound') startGame({ alwaysBombs: true });
+    else if (act === 'grid-sonicRound') startGame({ alwaysSonic: true });
+    else if (act === 'mode-hard') startGame({ hard: true });
+    else if (act === 'mode-bossesAlways') startGame({ bossesAlways: true });
+    else if (act === 'mode-2p') startVersus(false);
+    else if (act === 'mode-vscpu') startVersus(true);
+  });
 
-    buildBoard();
-    buildModeButtons();
-    refreshPreview();   // shows this combo's best + starting speed + time
-  </script>
+  // ================= INPUT + OVERLAY =================
+  document.addEventListener('mousemove', e => { hammer.style.left = e.clientX + 'px'; hammer.style.top = e.clientY + 'px';
+    hatEl.style.left = e.clientX + 'px'; hatEl.style.top = e.clientY + 'px'; mouseX = e.clientX; mouseY = e.clientY; });
+  document.addEventListener('mousedown', e => {
+    if (!running || picking) return;
+    if (e.target && e.target.closest && e.target.closest('button')) return;   // clicks on UI buttons aren't whacks
+    hammer.classList.add('swing'); setTimeout(() => hammer.classList.remove('swing'), 120);
+    const x = e.clientX, y = e.clientY;
+    if (mode === 'versus') { vsWhack(x, y, 'p1'); return; }
+    if (mode === 'classic' && bossActive && e.target.closest) { const bel = e.target.closest('.bossmini'); if (bel) { const b = bosses.find(z => z.el === bel); if (b) hitBossEntity(b, x, y); return; } }
+    const holeEl = e.target.closest ? e.target.closest('.hole') : null; if (!holeEl) return;
+    const hole = holes.find(h => h.el === holeEl);
+    if (mode === 'classic') {
+      if (hole && hole.up) { const t = hole.type; if (!isKeyType(t)) missStreak = 0;
+        if (t === 'hog') hitHog(hole, x, y);
+        else if (t === 'bomb') hitBomb(hole, x, y);
+        else if (t === 'sticky') hitSticky(hole, x, y);
+        else if (t === 'sonic') catchSonic(hole, x, y);
+        else if (t === 'shed') hitShed(hole, x, y);
+        else if (t === 'house') hitHouse(hole, x, y);
+        else if (t === 'mansion') hitMansion(hole, x, y);
+        else if (t === 'pinata') hitPinata(hole, x, y);
+        else if (isKeyType(t)) collectKey(hole, x, y);
+        else if (t === 'dragonHead') hitDragonHead(hole, x, y);
+        if (isBetter('aoe') && t === 'hog') aoeHit(hole);
+        if (isBetter('rocket') && t === 'hog') megaHit(hole);
+      } else classicMiss(x, y);
+      updateHud();
+    } else { if (hole && hole.up) { if (hole.type === 'sonic') catchDailySonic(hole, x, y); else if (hole.type === 'hog') dailyStrike(hole, x, y); } }
+  });
+
+  function showOverlay(title, msg, view) { quitBtn.classList.add('hidden'); roundKeysEl.classList.add('hidden'); overlay.querySelector('h1').textContent = title;
+    introEl.innerHTML = msg + '<br><br><span style="opacity:.8">Pick a mode to play again:</span>'; renderMenu(); renderBoardView(view); updateWinBanner(); overlay.classList.remove('hidden'); }
+
+  // ---- quit the current round (leave without recording a score) ----
+  function quitRound() {
+    if (!running) return; running = false; picking = false; stopTicking(); timerPill.classList.remove('frozen');
+    if (mode === 'classic') { clearInterval(countdownId); clearTimeout(popId); resetClassic(); }
+    else if (mode === 'most' || mode === 'speed') { clearInterval(dailyClockId); clearDaily(); }
+    else if (mode === 'versus') { clearInterval(vs.clockId); clearTimeout(vs.popId); cancelAnimationFrame(vs.rafId);
+      holes.forEach(h => { clearTimeout(h.timeout); h.up = false; h.el.className = 'hole'; h.el.innerHTML = ''; }); hammer2.classList.add('hidden'); }
+    showOverlay('Round ended ⏹', 'You left the round early — no score recorded.', (mode === 'most' || mode === 'speed') ? mode : 'classic');
+  }
+  quitBtn.addEventListener('click', e => { e.stopPropagation(); quitRound(); });
+  resetBtn.addEventListener('click', e => { e.stopPropagation();
+    if (!window.confirm('Reset ALL progress? This erases your keys, powers, hammers, grids, modes, money and win status. This cannot be undone.')) return;
+    try { localStorage.removeItem(UNLOCK_KEY); } catch (e2) {}
+    unlocks = defaultUnlocks(); saveUnlocks();
+    setHammer(); setHat(); updateMoneyHud(); updateWinBanner(); renderMenu(); renderBoardView('classic'); flash('🗑️ Progress reset!', 'bad'); });
+
+  startBtn.addEventListener('click', e => { e.stopPropagation(); startGame(); });
+  mostBtn.addEventListener('click', e => { e.stopPropagation(); startDaily('most'); });
+  speedBtn.addEventListener('click', e => { e.stopPropagation(); startDaily('speed'); });
+
+  // init
+  setHammer(); setHat(); updateMoneyHud(); setHudLabels(); buildGrid(CONFIG.cols); renderMenu(); renderBoardView('classic'); updateWinBanner(); updateKeyTotals();
+  if (part2Refunded) setTimeout(() => flash('💵 Part 2 was removed — refunded $1,000,000!', 'gold'), 400);
+})();
+</script>
 </body>
 </html>

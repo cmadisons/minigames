@@ -68,6 +68,34 @@
     .dpad .right { grid-column: 3; grid-row: 2; }
     .dpad .down { grid-column: 2; grid-row: 3; }
     @media (hover: hover) and (pointer: fine) { .dpad { display: none; } }
+
+    /* top-10 leaderboard */
+    .scores { width: 100%; max-width: 340px; margin: 26px auto 0; }
+    .scores h2 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 1px; color: #8890a6; margin-bottom: 10px; }
+    #score-list { list-style: none; counter-reset: rank; }
+    #score-list li {
+      counter-increment: rank;
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 14px; margin-bottom: 5px;
+      background: #16213e; border-radius: 9px; font-size: 0.94rem;
+    }
+    #score-list li::before {
+      content: counter(rank); flex: none; width: 1.5rem; text-align: right;
+      color: #8890a6; font-weight: 700; font-variant-numeric: tabular-nums;
+    }
+    #score-list li:nth-child(1) { background: #2a2545; }
+    #score-list li:nth-child(1)::before { content: "🥇"; }
+    #score-list li:nth-child(2)::before { content: "🥈"; }
+    #score-list li:nth-child(3)::before { content: "🥉"; }
+    #score-list .s { font-weight: 700; color: #ffd23f; font-variant-numeric: tabular-nums; }
+    #score-list .d { margin-left: auto; color: #8890a6; font-size: 0.8rem; }
+    #score-list li.empty { justify-content: center; color: #8890a6; }
+    #score-list li.empty::before { content: ""; width: 0; }
+    .btn.ghost {
+      background: transparent; border: 1px solid #2a3a5e; color: #9aa0b5;
+      font-size: 0.86rem; padding: 8px 18px; margin-top: 10px;
+    }
+    .btn.ghost:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
   </style>
 </head>
 <body>
@@ -126,6 +154,12 @@
     Grab a big <b style="color:#ffd23f">power pellet</b> to turn the ghosts blue — then chase them for bonus points!
   </p>
 
+  <section class="scores">
+    <h2>🏆 Top 10 Scores</h2>
+    <ol id="score-list"></ol>
+    <button class="btn ghost" id="reset-scores">Reset high scores</button>
+  </section>
+
   <script>
     // ---- Maze: 28 cols x 31 rows ----
     // # wall  . pellet  o power pellet  - ghost door  (space) empty
@@ -172,8 +206,45 @@
     const statusEl = document.getElementById("status");
     const startBtn = document.getElementById("start");
 
+    const listEl = document.getElementById("score-list");
+    const resetBtn = document.getElementById("reset-scores");
+
     const HS_KEY = "pacman-highscore";
+    const SCORES_KEY = "pacman-top-scores";
     function loadHigh() { return Number(localStorage.getItem(HS_KEY)) || 0; }
+
+    // ---- top-10 leaderboard ----
+    function loadScores() {
+      try { const a = JSON.parse(localStorage.getItem(SCORES_KEY)); return Array.isArray(a) ? a : []; }
+      catch (e) { return []; }
+    }
+    function addScore(s) {
+      if (!s || s <= 0) return;                    // don't clutter the board with zeroes
+      const a = loadScores();
+      a.push({ score: s, date: Date.now() });
+      a.sort((x, y) => y.score - x.score);
+      localStorage.setItem(SCORES_KEY, JSON.stringify(a.slice(0, 10)));
+    }
+    function renderScores() {
+      const a = loadScores();
+      if (!a.length) {
+        listEl.innerHTML = '<li class="empty">No scores yet — play a game!</li>';
+        return;
+      }
+      listEl.innerHTML = a.map(e =>
+        '<li><span class="s">' + e.score + '</span>' +
+        '<span class="d">' + new Date(e.date).toLocaleDateString() + '</span></li>'
+      ).join("");
+    }
+    resetBtn.addEventListener("click", () => {
+      if (!confirm("Erase all high scores? This can't be undone.")) return;
+      localStorage.removeItem(SCORES_KEY);
+      localStorage.removeItem(HS_KEY);
+      best = 0;
+      bestEl.textContent = "0";
+      renderScores();
+      statusEl.textContent = "High scores cleared.";
+    });
     // Append a result to a shared leaderboard list (read by the menu page).
     function pushRecord(key, entry) {
       let a; try { a = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { a = []; }
@@ -198,6 +269,11 @@
       { name: "clyde",  color: "#ffb852", home: { c: 1,  r: 27 }, start: { c: 16, r: 8 } },
     ];
     const PAC_START = { c: 13, r: 27 };
+    // The ghost house. Eaten ghosts float back here as eyes, wait, then come
+    // back out through the door above — instead of popping up in the open.
+    const PEN = { c: 13, r: 14 };
+    const PEN_EXIT = { c: 13, r: 11 };
+    const PEN_WAIT = 45;   // frames spent regenerating in the pen
 
     let grid;              // 2D array of chars (mutable — pellets get eaten)
     let pelletsLeft;
@@ -244,6 +320,7 @@
         x: g.start.c * TS, y: g.start.r * TS,
         dir: "up", speed: ghostSpeed(),
         fright: false, eyes: false,
+        exiting: false, penTimer: 0, eyeFrames: 0,
         start: g.start,
         releaseAt: i * 40,   // stagger them leaving
       }));
@@ -297,8 +374,10 @@
         if (c <= -1) { pac.x = (COLS - 1) * TS; return; }
         if (c >= COLS) { pac.x = 0; return; }
         if (canGo(r, c, pac.next, false)) pac.dir = pac.next;
-        if (!canGo(r, c, pac.dir, false)) return;   // blocked → stand still
+        // Eat *before* the blocked check — otherwise a dot sitting under a
+        // cornered Pac-Man never counts and the maze can never be cleared.
         eatAt(r, c);
+        if (!canGo(r, c, pac.dir, false)) return;   // blocked → stand still
       }
       const d = DIRS[pac.dir];
       pac.x += d.x * pac.speed;
@@ -306,6 +385,15 @@
       // wrap the tunnel
       if (pac.x < -TS) pac.x = COLS * TS;
       if (pac.x > COLS * TS) pac.x = -TS;
+      eatUnderPac();
+    }
+
+    // Touch a pellet and it's eaten — no need to line up exactly on the tile.
+    function eatUnderPac() {
+      const c = Math.floor((pac.x + TS / 2) / TS);
+      const r = Math.floor((pac.y + TS / 2) / TS);
+      if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+      eatAt(r, c);
     }
 
     function eatAt(r, c) {
@@ -326,7 +414,8 @@
 
     function ghostTarget(g) {
       const pt = tileOf(pac);
-      if (g.eyes) return g.start;                 // return home to respawn
+      if (g.eyes) return PEN;                     // float back to the ghost house
+      if (g.exiting) return PEN_EXIT;             // then head out through the door
       if (g.fright) return null;                  // handled as random
       if (scatterMode) return g.home;
       // chase: simplified personalities
@@ -345,7 +434,7 @@
     function chooseGhostDir(g, r, c) {
       const opts = ["up", "left", "down", "right"].filter(dir => {
         if (dir === OPP[g.dir]) return false;                 // no reversing
-        return canGo(r, c, dir, g.eyes);                      // eyes may use the door
+        return canGo(r, c, dir, g.eyes || g.exiting);         // door: eyes in, revived ghosts out
       });
       const choices = opts.length ? opts : [OPP[g.dir]];      // dead-end → reverse
       if (g.fright && !g.eyes) {
@@ -363,13 +452,41 @@
       g.dir = bestDir;
     }
 
+    function snap(v, step) { return Math.round(v / step) * step; }
+    // A ghost only turns (and only revives) on a tile boundary. Changing speed
+    // mid-tile can leave it on a lattice that never lands on one again — e.g. at
+    // x=5 with speed 4 it goes 9, 13, 17 and skips 16 forever. Re-snap on every
+    // speed change so an eaten ghost can always find its way home.
+    function setGhostSpeed(g, s) {
+      if (g.speed !== s) { g.x = snap(g.x, s); g.y = snap(g.y, s); g.speed = s; }
+    }
+
     function moveGhost(g) {
-      g.speed = g.eyes ? 4 : (g.fright ? 1 : ghostSpeed());
-      // eyes reached home → revive
-      if (g.eyes && aligned(g)) {
-        const t = tileOf(g);
-        if (t.c === g.start.c && t.r === g.start.r) { g.eyes = false; g.fright = false; }
+      // Regenerating inside the pen — hold still, then head for the door.
+      if (g.penTimer > 0) {
+        g.penTimer--;
+        if (g.penTimer === 0) { g.exiting = true; g.dir = "up"; }
+        return;
       }
+
+      setGhostSpeed(g, g.eyes ? 4 : (g.fright ? 1 : ghostSpeed()));
+
+      if (g.eyes) {
+        g.eyeFrames++;
+        if (aligned(g)) {
+          const t = tileOf(g);
+          // Reached the ghost house (or took far too long) → respawn there.
+          if ((t.c === PEN.c && t.r === PEN.r) || g.eyeFrames > 900) {
+            g.x = PEN.c * TS; g.y = PEN.r * TS;
+            g.eyes = false; g.fright = false; g.eyeFrames = 0;
+            g.penTimer = PEN_WAIT;
+            return;
+          }
+        }
+      }
+      // Once clear of the door, go back to normal chasing.
+      if (g.exiting && aligned(g) && tileOf(g).r <= PEN_EXIT.r) g.exiting = false;
+
       if (aligned(g)) {
         const { r, c } = tileOf(g);
         if (c <= -1) { g.x = (COLS - 1) * TS; return; }
@@ -389,6 +506,7 @@
           if (g.eyes) continue;
           if (g.fright) {
             g.eyes = true; g.fright = false;
+            g.x = snap(g.x, TS); g.y = snap(g.y, TS);   // start the trip home on a tile
             score += 200; onScore();
             statusEl.textContent = "Gotcha! +200";
           } else {
@@ -411,6 +529,7 @@
       ghosts.forEach(g => {
         g.x = g.start.c * TS; g.y = g.start.r * TS;
         g.dir = "up"; g.fright = false; g.eyes = false;
+        g.exiting = false; g.penTimer = 0; g.eyeFrames = 0;
       });
       frightTimer = 0;
     }
@@ -435,6 +554,8 @@
       statusEl.textContent = msg;
       startBtn.textContent = "Play Again";
       pushRecord("records-pacman", { score: score, date: Date.now() });
+      addScore(score);
+      renderScores();
     }
 
     // ---- main loop ----
@@ -568,6 +689,7 @@
     bestEl.textContent = best;
     spawnEntities();
     draw();
+    renderScores();
   </script>
 </body>
 </html>
