@@ -22,12 +22,25 @@ Also here: [games.md](games.md) · [TODO.md](TODO.md)
 
 ## 🏝️ Sky Blocks
 
-You start on a tiny floating island with one tree, one bucket of water and one
-of lava. Tap blocks to mine them, tap the sky to build.
+A skyblock game with its own look — its own blocks (Mosscap, Palestone,
+Sunwood, Aether, Emberflow) and its own characters, not copies of anyone's.
 
-The trick: leave **one empty square between the water and the lava** and it
-fills with cobblestone. Mine it and it fills again — unlimited blocks. That's
-how you grow the island. Six goals to work through.
+You start on a tiny floating isle. What's in it:
+
+| | |
+|---|---|
+| ⛏️ **5 skills** | Mining, Foraging, Farming, Fishing and Combat, each with levels and XP |
+| 🪙 **Coins** | Sell what you gather to Mia the trader |
+| 🤖 **Bots** | Gathering bots that keep working while the tab is shut — upgrade them to go faster |
+| 📚 **Collections** | Every block and fish counts toward milestones that pay out |
+| 🎣 **Fishing** | 11 catches from Spinefin to Tide Wyrm — and sea beasts that fight back |
+| ⚔️ **Arena** | Five foes that get tougher as your Combat level climbs |
+| 🌾 **Farming** | Buy seeds from Nara, plant on Loam, wait for them to ripen |
+| 🧔 **Six villagers** | Joe (jobs), Finn (lines), Pip (picks), Brann (blades), Nara (seeds), Mia (trading) |
+| 📜 **11 jobs** | Joe's quest chain, paying from 🪙60 up to 🪙4,000 |
+
+**The key trick:** leave one empty square between 💧 Aether and 🔥 Emberflow and
+it fills with Rubble. Mine it, it fills again — endless blocks, forever.
 
 ## Run it on your own computer
 
