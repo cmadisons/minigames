@@ -24,10 +24,23 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px;
+      padding: 72px 20px 24px;
       text-align: center;
     }
     h1 { margin: 4px 0 12px; font-size: 1.8rem; }
+
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 52px;
+      display: flex; align-items: center; gap: 12px; padding: 0 12px;
+      background: rgba(22,33,62,0.95); backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 200;
+    }
+    .topbar .back {
+      text-decoration: none; color: #eaeaea; font-size: 1.2rem; line-height: 1;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 7px 13px; flex-shrink: 0;
+    }
+    .topbar .back:hover { border-color: #e94560; }
 
     .stats {
       display: flex;
@@ -84,6 +97,10 @@
   </style>
 </head>
 <body>
+  <nav class="topbar">
+    <a class="back" href="index.html" title="Back to home">← Home</a>
+  </nav>
+
   <h1>🐍 Snake</h1>
 
   <div class="stats">
@@ -118,7 +135,7 @@
     const START_MS = 140;            // tick delay at the start
     const MIN_MS = 70;               // fastest tick delay
     const SPEEDUP = 3;               // ms shaved off per food eaten
-    const HS_KEY = "snake-highscore";
+    const HS_KEY = "records-snake";   // shared leaderboard format the menu reads
 
     const canvas = document.getElementById("board");
     const ctx = canvas.getContext("2d");
@@ -139,7 +156,16 @@
     let running;
     let paused;
 
-    function loadHigh() { return Number(localStorage.getItem(HS_KEY)) || 0; }
+    // Records are stored as an array of {score, date}; the menu shows the top 10.
+    function pushRecord(key, entry) {
+      let a; try { a = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { a = []; }
+      a.push(entry); if (a.length > 50) a = a.slice(-50);
+      localStorage.setItem(key, JSON.stringify(a));
+    }
+    function loadHigh() {
+      let a; try { a = JSON.parse(localStorage.getItem(HS_KEY)) || []; } catch (e) { a = []; }
+      return a.reduce((m, r) => (r && r.score > m ? r.score : m), 0);
+    }
 
     function placeFood() {
       // pick a random empty cell
@@ -242,14 +268,14 @@
     function gameOver() {
       running = false;
       clearInterval(loopTimer);
-      const best = loadHigh();
+      const prevBest = loadHigh();
+      pushRecord(HS_KEY, { score: score, date: Date.now() });
       let msg;
-      if (score > best) {
-        localStorage.setItem(HS_KEY, score);
+      if (score > prevBest) {
         bestEl.textContent = score;
         msg = "🏆 New high score: " + score + "!";
       } else {
-        msg = "Score: " + score + " · Best: " + best;
+        msg = "Score: " + score + " · Best: " + prevBest;
       }
       overTitle.textContent = "💀 Game Over";
       overSub.textContent = msg;
