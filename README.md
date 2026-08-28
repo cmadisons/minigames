@@ -11,6 +11,9 @@ Tap **Play** to run it. Tap **Code** to read how it works.
 | Game | | |
 |---|---|---|
 | 👻 Pacman | [▶️ Play](https://cmadisons.github.io/minigames/pacman.html) | [📄 Code](pacman.html) |
+| 🐍 Snake | [▶️ Play](https://cmadisons.github.io/minigames/snake.html) | [📄 Code](snake.html) |
+| 🧱 Tetris | [▶️ Play](https://cmadisons.github.io/minigames/tetris.html) | [📄 Code](tetris.html) |
+| ⬡ Hexagon Fall | [▶️ Play](https://cmadisons.github.io/minigames/hexagon-fall.html) | [📄 Code](hexagon-fall.html) |
 | 🏝️ Sky Blocks | [▶️ Play](https://cmadisons.github.io/minigames/skyblocks.html) | [📄 Code](skyblocks.html) |
 | 🦔 Whack-a-Hedgehog | [▶️ Play](https://cmadisons.github.io/minigames/hedgehog.html) | [📄 Code](hedgehog.html) |
 | 🧠 Memory | [▶️ Play](https://cmadisons.github.io/minigames/memory.html) | [📄 Code](memory.html) |

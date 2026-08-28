@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hexagon Fall</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --panel: #16213e;
+      --sky: #0f3460;
+      --text: #eaeaea;
+      --muted: #999;
+      --accent: #e94560;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 72px 12px 24px;
+      text-align: center;
+    }
+    h1 { margin: 4px 0 4px; font-size: 1.8rem; }
+    .tagline { color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }
+
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 52px;
+      display: flex; align-items: center; gap: 12px; padding: 0 12px;
+      background: rgba(22,33,62,0.95); backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 200;
+    }
+    .topbar .back {
+      text-decoration: none; color: #eaeaea; font-size: 1.2rem; line-height: 1;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 7px 13px; flex-shrink: 0;
+    }
+    .topbar .back:hover { border-color: var(--accent); }
+
+    .stats { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; justify-content: center; }
+    .stat { padding: 6px 14px; border-radius: 12px; background: var(--panel); min-width: 84px; }
+    .stat .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+    .stat .value { font-size: 1.4rem; font-weight: bold; }
+    #score-value { color: #ffd23f; }
+    #best-value { color: var(--accent); }
+    #togo-value { color: #2ecc71; }
+
+    .wrap { position: relative; display: inline-block; }
+    #board {
+      background: var(--sky);
+      border-radius: 10px;
+      display: block;
+      max-width: 100%;
+      height: auto;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(10, 15, 35, 0.86);
+      border-radius: 10px; gap: 12px; padding: 18px;
+    }
+    .overlay.hidden { display: none; }
+    .overlay .big { font-size: 1.35rem; font-weight: bold; }
+    .overlay .sub { color: #bbb; font-size: 0.88rem; max-width: 250px; line-height: 1.5; }
+
+    .btn {
+      padding: 11px 24px; font-size: 1rem; color: #fff;
+      background: var(--accent); border: none; border-radius: 10px; cursor: pointer;
+    }
+    .btn:hover { opacity: 0.9; }
+
+    .toast {
+      position: absolute; left: 50%; top: 12%; transform: translateX(-50%);
+      font-size: 1.1rem; font-weight: bold; color: #ffd23f;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.75);
+      pointer-events: none; opacity: 0; transition: opacity .2s ease; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+
+    .hint { color: #888; font-size: 0.85rem; margin-top: 14px; max-width: 470px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <nav class="topbar">
+    <a class="back" href="index.html" title="Back to home">← Home</a>
+  </nav>
+
+  <h1>⬡ Hexagon Fall</h1>
+  <p class="tagline">Tap the bricks away — just don't drop the hexagon.</p>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="label">Score</div>
+      <div class="value" id="score-value">0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Level</div>
+      <div class="value" id="level-value">1</div>
+    </div>
+    <div class="stat">
+      <div class="label">To go</div>
+      <div class="value" id="togo-value">0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Best</div>
+      <div class="value" id="best-value">0</div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <canvas id="board"></canvas>
+    <div class="toast" id="toast"></div>
+    <div class="overlay" id="overlay">
+      <div class="big" id="over-title">⬡ Hexagon Fall</div>
+      <div class="sub" id="over-sub">
+        A hexagon is balanced on a tower of bricks. Tap a brick to take it out —
+        everything above it drops. Clear your target without letting the hexagon
+        reach the ground.
+      </div>
+      <button class="btn" id="start">Start Game</button>
+    </div>
+  </div>
+
+  <p class="hint">
+    <strong>Tap or click any brick</strong> to remove it. Whatever was resting on it falls,
+    and so does the hexagon. It rolls off slopes, so watch the edges — if it touches the
+    ground, or rolls off the side of the tower, the game is over.
+    <strong>P</strong> pauses.
+  </p>
+
+  <script>
+    const GW = 9;                    // grid columns
+    const GH = 15;                   // grid rows; the last one is the ground
+    const GROUND = GH - 1;           // hexagon touching this row = game over
+    const CELL = 32;
+    const TOWER_LO = 1, TOWER_HI = 7; // columns the tower is built within,
+                                      // leaving open air either side to fall off
+    const ANIM_CELLS_PER_MS = 0.022; // how fast fallen pieces slide into place
+    const HS_KEY = "records-hexagon-fall";
+
+    const BRICKS = ["#e94560", "#22d3ee", "#2ecc71", "#f59e0b", "#a855f7", "#3b82f6"];
+
+    // Tetromino footprints, as cell offsets.
+    const SHAPES = [
+      [[0,0],[1,0],[2,0],[3,0]],            // I
+      [[0,0],[1,0],[0,1],[1,1]],            // O
+      [[0,0],[1,0],[2,0],[1,1]],            // T
+      [[1,0],[2,0],[0,1],[1,1]],            // S
+      [[0,0],[1,0],[1,1],[2,1]],            // Z
+      [[0,0],[0,1],[1,1],[2,1]],            // J
+      [[2,0],[0,1],[1,1],[2,1]],            // L
+    ];
+
+    const canvas = document.getElementById("board");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = document.getElementById("score-value");
+    const levelEl = document.getElementById("level-value");
+    const togoEl = document.getElementById("togo-value");
+    const bestEl = document.getElementById("best-value");
+    const overlay = document.getElementById("overlay");
+    const overTitle = document.getElementById("over-title");
+    const overSub = document.getElementById("over-sub");
+    const startBtn = document.getElementById("start");
+    const toastEl = document.getElementById("toast");
+
+    canvas.width = GW * CELL;
+    canvas.height = GH * CELL;
+
+    let grid;        // [row][col] → piece id, or null
+    let pieces;      // Map id → {id, color, cells:[{x,y}], vy}
+    let hex;         // {c, r, vy} the hexagon
+    let score, level, toGo;
+    let running, paused, over;
+    let nextId;
+    let hover;       // piece id under the pointer
+    let raf, lastFrame, toastTimer;
+
+    function pushRecord(key, entry) {
+      let a; try { a = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { a = []; }
+      a.push(entry); if (a.length > 50) a = a.slice(-50);
+      localStorage.setItem(key, JSON.stringify(a));
+    }
+    function loadHigh() {
+      let a; try { a = JSON.parse(localStorage.getItem(HS_KEY)) || []; } catch (e) { a = []; }
+      return a.reduce((m, r) => (r && r.score > m ? r.score : m), 0);
+    }
+
+    const inGrid = (x, y) => x >= 0 && x < GW && y >= 0 && y < GH;
+    // Bricks live above the ground row; the ground itself is solid floor.
+    const brickAt = (x, y) => (inGrid(x, y) ? grid[y][x] : null);
+    const hexAt = (x, y) => !!(hex && hex.c === x && hex.r === y);
+
+    function rotate(cells) {
+      const r = cells.map(([x, y]) => [-y, x]);
+      const minX = Math.min(...r.map(c => c[0]));
+      const minY = Math.min(...r.map(c => c[1]));
+      return r.map(([x, y]) => [x - minX, y - minY]);
+    }
+
+    // --- building the tower ---------------------------------------------------
+
+    // Drop tetrominoes into the middle columns until the tower is n pieces tall.
+    // Landing them under gravity is what produces the ledges and overhangs that
+    // make the tower interesting to dismantle.
+    function buildTower(n) {
+      grid = Array.from({ length: GH }, () => new Array(GW).fill(null));
+      pieces = new Map();
+      nextId = 1;
+      let placed = 0, tries = 0;
+      while (placed < n && tries++ < n * 30) {
+        let cells = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+        const turns = Math.floor(Math.random() * 4);
+        for (let i = 0; i < turns; i++) cells = rotate(cells);
+        const w = Math.max(...cells.map(c => c[0])) + 1;
+        const lo = TOWER_LO, hi = TOWER_HI - w + 1;
+        if (hi < lo) continue;
+        const x0 = lo + Math.floor(Math.random() * (hi - lo + 1));
+
+        // Fall from above until the next step down would hit something.
+        let y0 = -Math.max(...cells.map(c => c[1])) - 1;
+        const fits = dy => cells.every(([cx, cy]) => {
+          const x = x0 + cx, y = dy + cy;
+          if (x < 0 || x >= GW || y >= GROUND) return false;
+          return y < 0 || grid[y][x] === null;
+        });
+        // If this column has stacked up to the ceiling, try somewhere else
+        // rather than abandoning the whole tower.
+        if (!fits(y0)) continue;
+        while (fits(y0 + 1)) y0++;
+        if (cells.some(([, cy]) => y0 + cy < 0)) continue;
+
+        const id = nextId++;
+        const piece = {
+          id,
+          color: BRICKS[(id - 1) % BRICKS.length],
+          cells: cells.map(([cx, cy]) => ({ x: x0 + cx, y: y0 + cy })),
+          vy: 0,
+        };
+        for (const c of piece.cells) grid[c.y][c.x] = id;
+        pieces.set(id, piece);
+        placed++;
+      }
+      return placed;
+    }
+
+    // Perch the hexagon on the highest point of the tower.
+    function placeHex() {
+      let bestCol = Math.floor(GW / 2), bestTop = GH;
+      for (let x = 0; x < GW; x++) {
+        for (let y = 0; y < GH; y++) {
+          if (grid[y][x] !== null) { if (y < bestTop) { bestTop = y; bestCol = x; } break; }
+        }
+      }
+      hex = { c: bestCol, r: Math.max(0, bestTop - 1), vy: 0 };
+    }
+
+    // --- physics --------------------------------------------------------------
+
+    function canPieceFall(p) {
+      return p.cells.every(c => {
+        const ny = c.y + 1;
+        if (ny >= GROUND) return false;                    // resting on the ground
+        if (hexAt(c.x, ny)) return false;                  // resting on the hexagon
+        const occ = grid[ny][c.x];
+        return occ === null || occ === p.id;
+      });
+    }
+
+    function dropPiece(p) {
+      for (const c of p.cells) grid[c.y][c.x] = null;
+      for (const c of p.cells) c.y += 1;
+      for (const c of p.cells) grid[c.y][c.x] = p.id;
+      p.vy += 1;                                           // animate in from above
+    }
+
+    // Is there open air on this side of the hexagon? It needs the cell beside it
+    // and the one diagonally below to both be clear. Off the edge of the grid
+    // counts as clear — that is exactly how it falls off the tower.
+    function sideOpen(dx) {
+      const x = hex.c + dx;
+      if (x < 0 || x >= GW) return true;
+      return brickAt(x, hex.r) === null && (hex.r + 1 >= GROUND || brickAt(x, hex.r + 1) === null);
+    }
+
+    function settle() {
+      let guard = 0;
+      let changed = true;
+      while (changed && guard++ < 500) {
+        changed = false;
+        // Lowest pieces first, so a stack collapses from the bottom up.
+        const list = [...pieces.values()].sort(
+          (a, b) => Math.max(...b.cells.map(c => c.y)) - Math.max(...a.cells.map(c => c.y))
+        );
+        for (const p of list) if (canPieceFall(p)) { dropPiece(p); changed = true; }
+
+        if (hex) {
+          if (hex.r + 1 <= GROUND && brickAt(hex.c, hex.r + 1) === null) {
+            hex.r++; hex.vy += 1; changed = true;
+          } else if (hex.r < GROUND && sideOpen(-1) && sideOpen(1)) {
+            // Sitting on a brick is stable, even right on the lip of a ledge —
+            // but a lone pinnacle with open air on BOTH sides topples, toward
+            // whichever side drops further.
+            const dir = dropDepth(-1) >= dropDepth(1) ? -1 : 1;
+            hex.c += dir; hex.r++; hex.vy += 1; changed = true;
+          }
+        }
+        if (hex && (hex.c < 0 || hex.c >= GW || hex.r >= GROUND)) break;
+      }
+    }
+
+    // How far the hexagon would keep falling on that side.
+    function dropDepth(dx) {
+      const x = hex.c + dx;
+      if (x < 0 || x >= GW) return GH;
+      let d = 0;
+      for (let y = hex.r + 1; y < GROUND; y++) { if (brickAt(x, y) !== null) break; d++; }
+      return d;
+    }
+
+    // --- turns ----------------------------------------------------------------
+
+    function removePiece(id) {
+      const p = pieces.get(id);
+      if (!p) return;
+      for (const c of p.cells) grid[c.y][c.x] = null;
+      pieces.delete(id);
+      score += 10 * p.cells.length * level;
+      toGo--;
+      settle();
+      updateStats();
+
+      if (hex.c < 0 || hex.c >= GW || hex.r >= GROUND) { gameOver(); return; }
+      if (toGo <= 0) nextLevel();
+    }
+
+    function nextLevel() {
+      level++;
+      score += 250 * level;
+      showToast("Level " + level + "!  +" + 250 * level);
+      startLevel();
+    }
+
+    function startLevel() {
+      const built = buildTower(10 + Math.min(level, 8));
+      placeHex();
+      settle();
+      // Always leave a couple of pieces standing, so the target is reachable.
+      toGo = Math.max(1, Math.min(built - 3, 4 + level));
+      updateStats();
+    }
+
+    function showToast(text) {
+      toastEl.textContent = text;
+      toastEl.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove("show"), 1100);
+    }
+
+    function updateStats() {
+      scoreEl.textContent = score;
+      levelEl.textContent = level;
+      togoEl.textContent = Math.max(0, toGo);
+    }
+
+    // --- drawing --------------------------------------------------------------
+
+    function roundRect(c, x, y, w, h, r) {
+      c.beginPath();
+      c.moveTo(x + r, y);
+      c.arcTo(x + w, y, x + w, y + h, r);
+      c.arcTo(x + w, y + h, x, y + h, r);
+      c.arcTo(x, y + h, x, y, r);
+      c.arcTo(x, y, x + w, y, r);
+      c.closePath();
+    }
+
+    function drawBrick(px, py, color, lit) {
+      roundRect(ctx, px + 1.5, py + 1.5, CELL - 3, CELL - 3, 5);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.28)";
+      roundRect(ctx, px + 1.5, py + 1.5, CELL - 3, (CELL - 3) * 0.3, 5);
+      ctx.fill();
+      ctx.fillStyle = "rgba(0,0,0,0.24)";
+      roundRect(ctx, px + 1.5, py + CELL * 0.68, CELL - 3, CELL * 0.28, 5);
+      ctx.fill();
+      if (lit) {
+        roundRect(ctx, px + 1.5, py + 1.5, CELL - 3, CELL - 3, 5);
+        ctx.fillStyle = "rgba(255,255,255,0.3)";
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
+    function drawHexagon(px, py) {
+      const cx = px + CELL / 2, cy = py + CELL / 2, r = CELL * 0.46;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i - Math.PI / 6;   // pointy top
+        const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      const g = ctx.createLinearGradient(cx, cy - r, cx, cy + r);
+      g.addColorStop(0, "#fff3b0");
+      g.addColorStop(1, "#ffb703");
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = "#7a4b00";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#0f3460";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // The ground: touching it is what ends the run.
+      ctx.fillStyle = "#3b2a4a";
+      ctx.fillRect(0, GROUND * CELL, canvas.width, CELL);
+      ctx.strokeStyle = "rgba(233,69,96,0.55)";
+      ctx.setLineDash([6, 5]);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, GROUND * CELL + 1);
+      ctx.lineTo(canvas.width, GROUND * CELL + 1);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      if (pieces) {
+        for (const p of pieces.values())
+          for (const c of p.cells)
+            drawBrick(c.x * CELL, (c.y - p.vy) * CELL, p.color, hover === p.id && running && !paused);
+      }
+      if (hex) drawHexagon(hex.c * CELL, (hex.r - hex.vy) * CELL);
+    }
+
+    function update(dt) {
+      const ease = dt * ANIM_CELLS_PER_MS;
+      if (pieces) for (const p of pieces.values()) if (p.vy > 0) p.vy = Math.max(0, p.vy - ease);
+      if (hex && hex.vy > 0) hex.vy = Math.max(0, hex.vy - ease);
+    }
+
+    function frame(t) {
+      const dt = lastFrame ? Math.min(t - lastFrame, 100) : 0;
+      lastFrame = t;
+      update(dt);
+      draw();
+      raf = requestAnimationFrame(frame);
+    }
+
+    // --- game state -----------------------------------------------------------
+
+    function startGame() {
+      score = 0; level = 1;
+      running = true; paused = false; over = false;
+      lastFrame = 0;
+      startLevel();
+      overlay.classList.add("hidden");
+    }
+
+    function gameOver() {
+      running = false; over = true;
+      const prevBest = loadHigh();
+      pushRecord(HS_KEY, { score: score, date: Date.now(), mode: "Lv " + level });
+      overTitle.textContent = "⬡ It fell!";
+      overSub.textContent = (score > prevBest
+        ? "🏆 New high score: " + score + "!"
+        : "Score: " + score + " · Best: " + prevBest) + " · reached level " + level;
+      if (score > prevBest) bestEl.textContent = score;
+      startBtn.textContent = "Play Again";
+      overlay.classList.remove("hidden");
+    }
+
+    function togglePause() {
+      if (!running) return;
+      paused = !paused;
+      if (paused) {
+        overTitle.textContent = "⏸ Paused";
+        overSub.textContent = "Press P or the button to resume.";
+        startBtn.textContent = "Resume";
+        overlay.classList.remove("hidden");
+      } else {
+        overlay.classList.add("hidden");
+      }
+    }
+
+    // --- input ----------------------------------------------------------------
+
+    function cellFromEvent(e) {
+      const rect = canvas.getBoundingClientRect();
+      const src = e.touches && e.touches[0] ? e.touches[0] : e;
+      const scale = canvas.width / rect.width;
+      return {
+        x: Math.floor((src.clientX - rect.left) * scale / CELL),
+        y: Math.floor((src.clientY - rect.top) * scale / CELL),
+      };
+    }
+
+    function tapAt(x, y) {
+      if (!running || paused) return;
+      const id = brickAt(x, y);
+      if (id) removePiece(id);
+    }
+
+    canvas.addEventListener("click", e => {
+      const { x, y } = cellFromEvent(e);
+      tapAt(x, y);
+    });
+    canvas.addEventListener("mousemove", e => {
+      const { x, y } = cellFromEvent(e);
+      hover = brickAt(x, y);
+    });
+    canvas.addEventListener("mouseleave", () => { hover = null; });
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "p" || e.key === "P" || e.key === "Escape") { togglePause(); return; }
+      if (!running && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); startGame(); }
+    });
+
+    startBtn.addEventListener("click", () => {
+      if (paused) togglePause(); else startGame();
+    });
+
+    // initial paint
+    score = 0; level = 1; toGo = 0;
+    running = false; paused = false;
+    buildTower(12);
+    placeHex();
+    settle();
+    bestEl.textContent = loadHigh();
+    updateStats();
+    raf = requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
