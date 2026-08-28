@@ -109,6 +109,10 @@
       <div class="value" id="score-value">0</div>
     </div>
     <div class="stat">
+      <div class="label">Lives</div>
+      <div class="value" id="lives-value">❤️❤️❤️</div>
+    </div>
+    <div class="stat">
       <div class="label">Best</div>
       <div class="value" id="best-value">0</div>
     </div>
@@ -125,7 +129,9 @@
 
   <p class="hint">
     Move with <strong>Arrow keys</strong> or <strong>WASD</strong> (or swipe on touch).
-    <strong>Space</strong> pauses. Eating food grows you and speeds things up a little.
+    <strong>Space</strong> pauses. Eat mice to grow.
+    🧍 <strong>People hunt you</strong> — a bullet costs a ❤️ (0 = game over); eat the shooters for points.
+    🌳 <strong>Bushes</strong> either wipe out all hunters (a ❤️ each) or grant a spare ❤️.
   </p>
 
   <script>
@@ -135,12 +141,22 @@
     const START_MS = 140;            // tick delay at the start
     const MIN_MS = 70;               // fastest tick delay
     const SPEEDUP = 3;               // ms shaved off per food eaten
+    const MOUSE_MOVE_EVERY = 3;      // mouse steps once per 3 python moves (3× slower)
+    const MOUSE_TELEPORT_CHANCE = 0.02; // very rarely, a mouse blinks to a random cell
+    const MAX_PEOPLE = 3;            // hunters on the board at once
+    const PERSON_SPAWN_EVERY = 22;   // ticks between spawning a new person (if under max)
+    const SHOOT_EVERY = 16;          // ticks between shots (a random person fires)
+    const HEARTS_START = 3;          // lives you begin with
+    const HEARTS_MAX = 6;            // cap on hearts
+    const MAX_BUSHES = 2;            // bushes on the board at once
+    const BUSH_SPAWN_EVERY = 45;     // ticks between spawning a bush
     const HS_KEY = "records-snake";   // shared leaderboard format the menu reads
 
     const canvas = document.getElementById("board");
     const ctx = canvas.getContext("2d");
     const scoreEl = document.getElementById("score-value");
     const bestEl = document.getElementById("best-value");
+    const livesEl = document.getElementById("lives-value");
     const overlay = document.getElementById("overlay");
     const overTitle = document.getElementById("over-title");
     const overSub = document.getElementById("over-sub");
@@ -155,6 +171,15 @@
     let loopTimer;
     let running;
     let paused;
+    let foodStep;     // counts python moves so the mouse steps every 3rd one
+    let people;       // [{x,y,special}] hunters that shoot at you
+    let bullets;      // [{x,y,dx,dy}] shots in flight
+    let personTimer;  // ticks since last person spawn
+    let shootTimer;   // ticks since last shot
+    let hearts;       // lives — a bullet costs one, 0 = game over
+    let bushes;       // [{x,y}] power-up bushes
+    let bushTimer;    // ticks since last bush spawn
+    let hitFlash;     // frames of red flash after taking a hit
 
     // Records are stored as an array of {score, date}; the menu shows the top 10.
     function pushRecord(key, entry) {
@@ -168,14 +193,117 @@
     }
 
     function placeFood() {
-      // pick a random empty cell
+      // pick a random empty cell (avoid snake, people, and bushes)
       let cell;
       do {
         cell = { x: rand(GRID), y: rand(GRID) };
-      } while (snake.some(s => s.x === cell.x && s.y === cell.y));
+      } while (
+        snake.some(s => s.x === cell.x && s.y === cell.y) ||
+        people.some(p => p.x === cell.x && p.y === cell.y) ||
+        bushes.some(b => b.x === cell.x && b.y === cell.y)
+      );
       food = cell;
     }
     function rand(n) { return Math.floor(Math.random() * n); }
+
+    // empty (in-bounds, not-snake) cells orthogonally next to a cell
+    function emptyNeighbors(cell) {
+      const cand = [
+        { x: cell.x, y: cell.y - 1 },
+        { x: cell.x, y: cell.y + 1 },
+        { x: cell.x - 1, y: cell.y },
+        { x: cell.x + 1, y: cell.y },
+      ];
+      return cand.filter(c =>
+        c.x >= 0 && c.y >= 0 && c.x < GRID && c.y < GRID &&
+        !snake.some(s => s.x === c.x && s.y === c.y)
+      );
+    }
+    function moveMouse() {
+      if (Math.random() < MOUSE_TELEPORT_CHANCE) { placeFood(); return; } // rare teleport
+      const opts = emptyNeighbors(food);
+      if (opts.length === 0) return;   // cornered — hold still this step
+      food = opts[Math.floor(Math.random() * opts.length)];
+    }
+
+    // a random empty cell (not snake, food, another person, or a bullet)
+    function randomEmptyCell() {
+      for (let tries = 0; tries < 80; tries++) {
+        const c = { x: rand(GRID), y: rand(GRID) };
+        if (snake.some(s => s.x === c.x && s.y === c.y)) continue;
+        if (food.x === c.x && food.y === c.y) continue;
+        if (people.some(p => p.x === c.x && p.y === c.y)) continue;
+        if (bushes.some(b => b.x === c.x && b.y === c.y)) continue;
+        if (bullets.some(b => b.x === c.x && b.y === c.y)) continue;
+        return c;
+      }
+      return null;
+    }
+    function maybeSpawnPerson() {
+      if (++personTimer < PERSON_SPAWN_EVERY) return;
+      personTimer = 0;
+      if (people.length >= MAX_PEOPLE) return;
+      const cell = randomEmptyCell();
+      if (cell) people.push({ x: cell.x, y: cell.y, special: Math.random() < 0.01 });
+    }
+    function maybeShoot() {
+      if (++shootTimer < SHOOT_EVERY) return;
+      shootTimer = 0;
+      if (people.length === 0) return;
+      const p = people[rand(people.length)];
+      if (p.special) {
+        // special hunters spray all 4 cardinal directions (no diagonals)
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          bullets.push({ x: p.x + dx, y: p.y + dy, dx, dy });
+        }
+        return;
+      }
+      const head = snake[0];
+      const ddx = head.x - p.x, ddy = head.y - p.y;
+      // fire along the axis that points most directly at the python
+      let dx = 0, dy = 0;
+      if (Math.abs(ddx) >= Math.abs(ddy)) dx = Math.sign(ddx);
+      else dy = Math.sign(ddy);
+      if (dx === 0 && dy === 0) return;
+      bullets.push({ x: p.x + dx, y: p.y + dy, dx, dy });
+    }
+    // advance bullets one step; a bullet that lands on the python costs a heart.
+    // returns true if that empties your hearts (game over).
+    function updateBullets() {
+      for (const b of bullets) { b.x += b.dx; b.y += b.dy; }
+      bullets = bullets.filter(b => b.x >= 0 && b.y >= 0 && b.x < GRID && b.y < GRID);
+      const hitting = bullets.filter(b => snake.some(s => s.x === b.x && s.y === b.y));
+      if (hitting.length) {
+        bullets = bullets.filter(b => !hitting.includes(b)); // consume the ones that hit
+        hearts -= hitting.length;
+        hitFlash = 2;
+        updateHeartsUI();
+        if (hearts <= 0) return true;
+      }
+      return false;
+    }
+    function updateHeartsUI() {
+      livesEl.textContent = hearts > 0 ? "❤️".repeat(hearts) : "💀";
+    }
+
+    function maybeSpawnBush() {
+      if (++bushTimer < BUSH_SPAWN_EVERY) return;
+      bushTimer = 0;
+      if (bushes.length >= MAX_BUSHES) return;
+      const cell = randomEmptyCell();
+      if (cell) bushes.push(cell);
+    }
+    // eating a bush → random reward: clear all hunters (+1 heart each), or +1 heart
+    function applyBush() {
+      if (Math.random() < 0.5 && people.length > 0) {
+        const killed = people.length;
+        people = [];
+        hearts = Math.min(HEARTS_MAX, hearts + killed);
+      } else {
+        hearts = Math.min(HEARTS_MAX, hearts + 1);
+      }
+      updateHeartsUI();
+    }
 
     function draw() {
       // background
@@ -190,13 +318,151 @@
         ctx.beginPath(); ctx.moveTo(0, i * CELL); ctx.lineTo(canvas.width, i * CELL); ctx.stroke();
       }
 
-      // food
-      drawCell(food.x, food.y, getCSS("--food"), true);
+      // food (a little mouse for the python to eat)
+      drawMouse(food.x, food.y);
 
-      // snake
-      snake.forEach((s, idx) => {
-        drawCell(s.x, s.y, idx === 0 ? getCSS("--snake-head") : getCSS("--snake"));
-      });
+      // power-up bushes
+      drawBushes();
+
+      // people who hunt you (you can eat them too)
+      drawPeople();
+
+      // snake (drawn as a patterned python)
+      drawPython();
+
+      // bullets on top
+      drawBullets();
+
+      // red flash when you just took a hit
+      if (hitFlash > 0) {
+        ctx.fillStyle = "rgba(233,69,96,0.28)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        hitFlash--;
+      }
+    }
+    function drawBushes() {
+      ctx.font = (CELL * 0.82) + "px serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const b of bushes) {
+        ctx.fillText("🌳", b.x * CELL + CELL / 2, b.y * CELL + CELL / 2 + 1);
+      }
+    }
+    function drawPeople() {
+      ctx.font = (CELL * 0.82) + "px serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const p of people) {
+        ctx.fillText(p.special ? "🤖" : "🧍", p.x * CELL + CELL / 2, p.y * CELL + CELL / 2 + 1);
+      }
+    }
+    function drawBullets() {
+      for (const b of bullets) {
+        const cx = b.x * CELL + CELL / 2, cy = b.y * CELL + CELL / 2;
+        circle(cx, cy, CELL * 0.17, "#ff9f1c");
+        circle(cx, cy, CELL * 0.08, "#e94560");
+      }
+    }
+
+    // --- python rendering ---
+    const PY = {
+      body: "#5aa845", bodyDark: "#356b28", belly: "#cbe8a6",
+      head: "#6bbd4f", eye: "#f4d03f", pupil: "#141414", tongue: "#e94560",
+    };
+    function circle(cx, cy, r, color, alpha) {
+      ctx.globalAlpha = alpha == null ? 1 : alpha;
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    function blotch(cx, cy, r, color) {   // diamond "saddle" marking
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy);
+      ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r, cy);
+      ctx.closePath(); ctx.fill();
+    }
+    function drawPython() {
+      const n = snake.length;
+      // body: tail → just behind the head, tapering toward the tail
+      for (let i = n - 1; i >= 1; i--) {
+        const s = snake[i];
+        const cx = s.x * CELL + CELL / 2;
+        const cy = s.y * CELL + CELL / 2;
+        const t = i / (n - 1);                    // 0 near head .. 1 at tail
+        const radius = CELL * (0.5 - 0.16 * t);
+        circle(cx, cy, radius, PY.body);          // green body
+        circle(cx, cy, radius * 0.55, PY.belly, 0.22); // lighter belly sheen
+        if (i % 2 === 0) blotch(cx, cy, radius * 0.7, PY.bodyDark); // pattern
+      }
+      drawHead();
+    }
+    function drawEye(x, y, r) {
+      ctx.fillStyle = PY.eye;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = PY.pupil;
+      ctx.beginPath(); ctx.arc(x + r * 0.15, y, r * 0.5, 0, Math.PI * 2); ctx.fill();
+    }
+    function drawHead() {
+      const s = snake[0];
+      const cx = s.x * CELL + CELL / 2;
+      const cy = s.y * CELL + CELL / 2;
+      const r = CELL * 0.56;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(Math.atan2(dir.y, dir.x));       // face the direction of travel
+      // head (elongated snout)
+      ctx.fillStyle = PY.head;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 1.05, r * 0.85, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // dark arrow marking on top of the head
+      ctx.fillStyle = PY.bodyDark;
+      ctx.beginPath();
+      ctx.moveTo(r * 0.25, 0);
+      ctx.lineTo(-r * 0.35, -r * 0.42);
+      ctx.lineTo(-r * 0.12, 0);
+      ctx.lineTo(-r * 0.35, r * 0.42);
+      ctx.closePath(); ctx.fill();
+      // forked tongue flicking ahead
+      ctx.strokeStyle = PY.tongue;
+      ctx.lineWidth = 2; ctx.lineCap = "round";
+      const base = r * 0.95, tlen = r * 0.9;
+      ctx.beginPath(); ctx.moveTo(base, 0); ctx.lineTo(base + tlen * 0.6, 0); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(base + tlen * 0.6, 0); ctx.lineTo(base + tlen, -tlen * 0.3);
+      ctx.moveTo(base + tlen * 0.6, 0); ctx.lineTo(base + tlen, tlen * 0.3);
+      ctx.stroke();
+      // eyes near the front
+      drawEye(r * 0.3, -r * 0.5, r * 0.22);
+      drawEye(r * 0.3, r * 0.5, r * 0.22);
+      ctx.restore();
+    }
+
+    // --- food: a little mouse (faces left, tail curling to the right) ---
+    function drawMouse(gx, gy) {
+      const cx = gx * CELL + CELL / 2;
+      const cy = gy * CELL + CELL / 2;
+      const r = CELL * 0.34;
+      // curly tail
+      ctx.strokeStyle = "#c98b98";
+      ctx.lineWidth = 2; ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx + r * 0.6, cy + r * 0.25);
+      ctx.quadraticCurveTo(cx + r * 2.0, cy + r * 0.2, cx + r * 1.4, cy - r * 0.8);
+      ctx.stroke();
+      // ears (outer + pink inner)
+      circle(cx - r * 0.7, cy - r * 0.7, r * 0.5, "#c9cdd6");
+      circle(cx + r * 0.05, cy - r * 0.85, r * 0.5, "#c9cdd6");
+      circle(cx - r * 0.7, cy - r * 0.7, r * 0.26, "#e8a6b4");
+      circle(cx + r * 0.05, cy - r * 0.85, r * 0.26, "#e8a6b4");
+      // body + snout
+      circle(cx, cy, r, "#b8bcc4");
+      circle(cx - r * 0.85, cy + r * 0.05, r * 0.55, "#c3c7cf");
+      // pink nose
+      circle(cx - r * 1.35, cy + r * 0.05, r * 0.16, "#e94560");
+      // eye
+      circle(cx - r * 0.45, cy - r * 0.12, r * 0.12, "#1a1a1a");
     }
     function drawCell(x, y, color, round) {
       const pad = 2;
@@ -222,22 +488,39 @@
       dir = nextDir;
       const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
 
-      // wall or self collision → game over
+      // wall / self → game over (a bullet only kills when it lands on you, below)
       const hitWall = head.x < 0 || head.y < 0 || head.x >= GRID || head.y >= GRID;
       const hitSelf = snake.some(s => s.x === head.x && s.y === head.y);
       if (hitWall || hitSelf) return gameOver();
 
+      // eat a person if the head lands on one
+      const personIdx = people.findIndex(p => p.x === head.x && p.y === head.y);
+      if (personIdx >= 0) people.splice(personIdx, 1);
+
+      // walk into a bush → random reward (doesn't grow you)
+      const bushIdx = bushes.findIndex(b => b.x === head.x && b.y === head.y);
+      if (bushIdx >= 0) { bushes.splice(bushIdx, 1); applyBush(); }
+
       snake.unshift(head);
 
-      if (head.x === food.x && head.y === food.y) {
+      const ateMouse = head.x === food.x && head.y === food.y;
+      if (ateMouse || personIdx >= 0) {
         score++;
         scoreEl.textContent = score;
         tickMs = Math.max(MIN_MS, tickMs - SPEEDUP);
-        placeFood();
+        if (ateMouse) { placeFood(); foodStep = 0; } // fresh mouse gets a full 3 moves
         restartLoop();
       } else {
         snake.pop(); // move forward: drop tail
+        // the mouse moves 3× slower than the python
+        if (++foodStep >= MOUSE_MOVE_EVERY) { foodStep = 0; moveMouse(); }
       }
+
+      // hunters: advance shots, then spawn / fire
+      if (updateBullets()) return gameOver();
+      maybeSpawnPerson();
+      maybeShoot();
+      maybeSpawnBush();
 
       draw();
     }
@@ -257,6 +540,16 @@
       tickMs = START_MS;
       running = true;
       paused = false;
+      foodStep = 0;
+      people = [];
+      bullets = [];
+      personTimer = 0;
+      shootTimer = 0;
+      hearts = HEARTS_START;
+      bushes = [];
+      bushTimer = 0;
+      hitFlash = 0;
+      updateHeartsUI();
       scoreEl.textContent = "0";
       bestEl.textContent = loadHigh();
       placeFood();
@@ -340,6 +633,12 @@
     snake = [{ x: 9, y: 9 }];
     food = { x: 4, y: 4 };
     dir = { x: 1, y: 0 };
+    people = [];
+    bullets = [];
+    bushes = [];
+    hearts = HEARTS_START;
+    hitFlash = 0;
+    updateHeartsUI();
     draw();
   </script>
 </body>
