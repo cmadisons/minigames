@@ -14,6 +14,7 @@ Tap **Play** to run it. Tap **Code** to read how it works.
 | 🐍 Snake | [▶️ Play](https://cmadisons.github.io/minigames/snake.html) | [📄 Code](snake.html) |
 | 🧱 Tetris | [▶️ Play](https://cmadisons.github.io/minigames/tetris.html) | [📄 Code](tetris.html) |
 | ⬡ Hexagon Fall | [▶️ Play](https://cmadisons.github.io/minigames/hexagon-fall.html) | [📄 Code](hexagon-fall.html) |
+| 🏃 Gap Runner | [▶️ Play](https://cmadisons.github.io/minigames/runner.html) | [📄 Code](runner.html) |
 | 🏝️ Sky Blocks | [▶️ Play](https://cmadisons.github.io/minigames/skyblocks.html) | [📄 Code](skyblocks.html) |
 | 🦔 Whack-a-Hedgehog | [▶️ Play](https://cmadisons.github.io/minigames/hedgehog.html) | [📄 Code](hedgehog.html) |
 | 🧠 Memory | [▶️ Play](https://cmadisons.github.io/minigames/memory.html) | [📄 Code](memory.html) |

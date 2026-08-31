@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gap Runner</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --panel: #16213e;
+      --text: #eaeaea;
+      --muted: #999;
+      --accent: #e94560;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 72px 12px 24px;
+      text-align: center;
+    }
+    h1 { margin: 4px 0 4px; font-size: 1.8rem; }
+    .tagline { color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }
+
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 52px;
+      display: flex; align-items: center; gap: 12px; padding: 0 12px;
+      background: rgba(22,33,62,0.95); backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 200;
+    }
+    .topbar .back {
+      text-decoration: none; color: #eaeaea; font-size: 1.2rem; line-height: 1;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 7px 13px; flex-shrink: 0;
+    }
+    .topbar .back:hover { border-color: var(--accent); }
+
+    .stats { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; justify-content: center; }
+    .stat { padding: 6px 14px; border-radius: 12px; background: var(--panel); min-width: 84px; }
+    .stat .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+    .stat .value { font-size: 1.4rem; font-weight: bold; }
+    #score-value { color: #ffd23f; }
+    #level-value { color: #22d3ee; }
+    #togo-value { color: #2ecc71; }
+    #best-value { color: var(--accent); }
+
+    .wrap { position: relative; display: inline-block; max-width: 100%; }
+    #board {
+      background: #0f3460;
+      border-radius: 10px;
+      display: block;
+      max-width: 100%;
+      height: auto;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(10, 15, 35, 0.86);
+      border-radius: 10px; gap: 12px; padding: 18px;
+    }
+    .overlay.hidden { display: none; }
+    .overlay .big { font-size: 1.35rem; font-weight: bold; }
+    .overlay .sub { color: #bbb; font-size: 0.88rem; max-width: 330px; line-height: 1.5; }
+
+    .btn {
+      padding: 11px 24px; font-size: 1rem; color: #fff;
+      background: var(--accent); border: none; border-radius: 10px; cursor: pointer;
+    }
+    .btn:hover { opacity: 0.9; }
+
+    .toast {
+      position: absolute; left: 50%; top: 14%; transform: translateX(-50%);
+      font-size: 1.1rem; font-weight: bold; color: #ffd23f;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.75);
+      pointer-events: none; opacity: 0; transition: opacity .2s ease; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+    .banner {
+      position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%) scale(0.85);
+      font-size: 1.9rem; font-weight: 800; color: #fff; letter-spacing: 1px;
+      text-shadow: 0 3px 18px rgba(0,0,0,0.85);
+      pointer-events: none; opacity: 0; transition: opacity .25s ease, transform .25s ease;
+      white-space: nowrap; line-height: 1.3;
+    }
+    .banner small { display: block; font-size: 0.95rem; font-weight: 600; color: #ffd23f; letter-spacing: 0; }
+    .banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+    .hint { color: #888; font-size: 0.85rem; margin-top: 14px; max-width: 500px; line-height: 1.6; }
+    .levels {
+      margin: 16px auto 0; max-width: 500px; text-align: left;
+      background: var(--panel); border-radius: 12px; padding: 14px 18px;
+      font-size: 0.84rem; color: #b9c0d4; line-height: 1.7;
+    }
+    .levels h2 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+    .levels b { color: #eaeaea; }
+  </style>
+</head>
+<body>
+  <nav class="topbar">
+    <a class="back" href="index.html" title="Back to home">← Home</a>
+  </nav>
+
+  <h1>🏃 Gap Runner</h1>
+  <p class="tagline">Run the line. Jump the holes, duck the pipes, survive the next level.</p>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="label">Score</div>
+      <div class="value" id="score-value">0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Level</div>
+      <div class="value" id="level-value">1</div>
+    </div>
+    <div class="stat">
+      <div class="label">To go</div>
+      <div class="value" id="togo-value">0m</div>
+    </div>
+    <div class="stat">
+      <div class="label">Best</div>
+      <div class="value" id="best-value">0</div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <canvas id="board"></canvas>
+    <div class="toast" id="toast"></div>
+    <div class="banner" id="banner"></div>
+    <div class="overlay" id="overlay">
+      <div class="big" id="over-title">🏃 Gap Runner</div>
+      <div class="sub" id="over-sub">
+        You run along a line full of holes. <strong>Left click to jump</strong>,
+        click again in mid-air to double jump, and <strong>hold ↓ to crouch</strong>
+        under the pipes. Reach the checkpoint flag to clear the level — every level
+        runs faster and throws something new at you.
+      </div>
+      <button class="btn" id="start">Start Running</button>
+    </div>
+  </div>
+
+  <p class="hint">
+    <strong>Click</strong> (or <strong>Space</strong>) to jump ·
+    <strong>click again while airborne</strong> to double jump — your runner flips ·
+    <strong>hold ↓</strong> (or right-click) to crouch under the pipes, which also
+    dives you back down faster in mid-air. The two dots up top are the jumps you
+    have left. <strong>P</strong> pauses.
+  </p>
+
+  <div class="levels">
+    <h2>What each level adds</h2>
+    <b>1</b> · plain holes, gentle pace &nbsp;·&nbsp;
+    <b>2</b> · wide holes that need the double jump &nbsp;·&nbsp;
+    <b>3</b> · 🔺 spikes planted on the line &nbsp;·&nbsp;
+    <b>4</b> · 🚧 pipes down from the sky — hold ↓ to duck under &nbsp;·&nbsp;
+    <b>5</b> · 🪨 stepping stones over holes too big to cross &nbsp;·&nbsp;
+    <b>6</b> · 🟠 crumbling ground that drops the moment you land &nbsp;·&nbsp;
+    <b>7+</b> · all of it, faster and tighter every level.
+  </div>
+
+  <script>
+    const W = 760, H = 340;
+    const GROUND_Y = 252;        // y of the top of the main line
+    const GROUND_H = H - GROUND_Y;
+    const PLAYER_X = 150;        // the runner is pinned here; the world scrolls past
+    const GRAV = 2400;           // px/s²
+    const JUMP_V = 760;          // px/s of upward kick, same for both jumps
+    const BASE_SPEED = 320, MAX_SPEED = 700;
+    const COYOTE = 0.11;         // grace after running off an edge
+    const BUFFER = 0.12;         // grace for clicking just before landing
+    const LEVEL_SECONDS = 15;    // how long a level lasts at its own speed
+    const CRUMBLE_TIME = 0.34;   // how long crumbling ground holds you up
+    const SPIKE_H = 22;
+    const STAND_H = 72;          // how tall the runner is, feet to top of head
+    const CROUCH_H = 45;         // ...and hunched over
+    const PIPE_BOTTOM = GROUND_Y - 54;   // low enough to stop a standing runner
+    const HS_KEY = "records-runner";
+
+    // Each level gets its own sky so you can see at a glance that things changed.
+    const SKIES = [
+      { top: "#141c3a", mid: "#123055", bot: "#0f3460", far: "#182a52", near: "#1d3566", grass: "#2ecc71", dirt: "#3b2a4a" },
+      { top: "#2a1740", mid: "#43215c", bot: "#5b2a6b", far: "#331a4d", near: "#43225f", grass: "#c084fc", dirt: "#2e1b3d" },
+      { top: "#3b1a2b", mid: "#7a2f2f", bot: "#b8562f", far: "#4a2233", near: "#632c3a", grass: "#ffb703", dirt: "#3a2130" },
+      { top: "#07262c", mid: "#0b4048", bot: "#0e5c63", far: "#0b3038", near: "#0f4048", grass: "#22d3ee", dirt: "#123038" },
+      { top: "#1c0f1f", mid: "#3d1220", bot: "#5c1a2a", far: "#2a1220", near: "#3a1828", grass: "#e94560", dirt: "#2a1420" },
+      { top: "#0e2416", mid: "#14472c", bot: "#1a6b41", far: "#123420", near: "#17452c", grass: "#a3e635", dirt: "#1b2b1c" },
+    ];
+
+    // What is new when you arrive at a level. Anything past this is "faster".
+    const LEVEL_NOTES = {
+      2: "Wide holes — use the double jump",
+      3: "Spikes on the line",
+      4: "Pipes from the sky — hold ↓ to crouch",
+      5: "Stepping stones",
+      6: "Crumbling ground",
+    };
+
+    const canvas = document.getElementById("board");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = document.getElementById("score-value");
+    const levelEl = document.getElementById("level-value");
+    const togoEl = document.getElementById("togo-value");
+    const bestEl = document.getElementById("best-value");
+    const overlay = document.getElementById("overlay");
+    const overTitle = document.getElementById("over-title");
+    const overSub = document.getElementById("over-sub");
+    const startBtn = document.getElementById("start");
+    const toastEl = document.getElementById("toast");
+    const bannerEl = document.getElementById("banner");
+
+    canvas.width = W;
+    canvas.height = H;
+
+    let segs;        // solid pieces: {x, w, y, stone?, crumble?, touched?, timer}
+    let gaps;        // the holes between them: {x0, x1, bonus, scored}
+    let spikes;      // {x, w, y} sitting on top of a piece
+    let pipes;       // {x, w} hanging out of the sky — duck or die
+    let crouchHeld;  // is the crouch key/touch down right now
+    let dust;        // little kicked-up particles
+    let player;
+    let camX, dist, speed, score, gapCount, pendingEasy;
+    let level, levelStart, levelLen;
+    let running, paused, over, deathCause;
+    let raf, lastFrame, toastTimer, bannerTimer;
+
+    function pushRecord(key, entry) {
+      let a; try { a = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { a = []; }
+      a.push(entry); if (a.length > 50) a = a.slice(-50);
+      localStorage.setItem(key, JSON.stringify(a));
+    }
+    function loadHigh() {
+      let a; try { a = JSON.parse(localStorage.getItem(HS_KEY)) || []; } catch (e) { a = []; }
+      return a.reduce((m, r) => (r && r.score > m ? r.score : m), 0);
+    }
+
+    // --- difficulty -----------------------------------------------------------
+
+    // Every dial the course generator turns, as a function of the level. Holes are
+    // measured as a fraction of jumpReach() — the distance one jump covers — so
+    // they stay in step with the speed instead of scaling out of reach.
+    function levelConfig(n) {
+      const t = n - 1;
+      return {
+        speed:    Math.min(MAX_SPEED, BASE_SPEED + t * 38),
+        gapMin:   Math.min(0.60, 0.30 + t * 0.035),
+        gapMax:   Math.min(0.88, 0.66 + t * 0.030),
+        bigEvery: n < 2 ? 0 : n < 3 ? 4 : n < 7 ? 3 : 2,   // 0 = no wide holes yet
+        bigMin:   Math.min(1.18, 1.02 + t * 0.02),
+        bigMax:   Math.min(1.42, 1.26 + t * 0.02),
+        strip:    Math.max(0.36, 0.62 - t * 0.03),         // seconds of ground to land on
+        stripVar: Math.max(90, 200 - t * 12),
+        spikes:   n >= 3 ? Math.min(0.45, 0.20 + (n - 3) * 0.05) : 0,
+        pipes:    n >= 4 ? Math.min(0.50, 0.22 + (n - 4) * 0.06) : 0,
+        stones:   n >= 5 ? Math.min(0.34, 0.15 + (n - 5) * 0.04) : 0,
+        crumble:  n >= 6 ? Math.min(0.38, 0.15 + (n - 6) * 0.05) : 0,
+      };
+    }
+
+    function sky() { return SKIES[(level - 1) % SKIES.length]; }
+
+    // --- the line and its holes ----------------------------------------------
+
+    // How far the runner travels during one jump at the current speed. The double
+    // jump is worth 1.71x this, which is the ceiling every hole is sized against.
+    function jumpReach() { return speed * (2 * JUMP_V / GRAV); }
+
+    function pushGap(x0, x1, bonus) { gaps.push({ x0, x1, bonus, scored: false }); }
+
+    // The piece of ground you land on after a hole. `catchDist` is how far past
+    // the near edge a jump taken at the last possible moment comes down — the
+    // platform is never shorter than that, so "jump late" always works.
+    function addLanding(x, cfg, catchDist, allowSpikes) {
+      const reach = jumpReach();
+      let w = Math.max(speed * cfg.strip + Math.random() * cfg.stripVar, catchDist + 80);
+      const seg = { x, w, y: GROUND_Y };
+
+      if (allowSpikes && cfg.spikes && Math.random() < cfg.spikes) {
+        // A spike has to be met on foot and jumped off solid ground: it sits past
+        // the furthest point the jump in could drop you, with a whole jump's worth
+        // of platform after it to land back on.
+        const sw = 26 + Math.random() * 22;
+        seg.w = Math.max(w, reach * 2.25 + sw + 170);
+        const lo = x + reach * 0.85 + 30;
+        const hi = x + seg.w - reach * 1.15 - 80 - sw;
+        if (hi > lo) spikes.push({ x: lo + Math.random() * (hi - lo), w: sw, y: GROUND_Y });
+      } else if (cfg.pipes && Math.random() < cfg.pipes) {
+        // Same idea overhead: the pipe is far enough in that you are always back
+        // on your feet before you reach it, with room to get going again after.
+        const pw = 42 + Math.random() * 26;
+        const px = x + reach * 1.5;
+        seg.w = Math.max(w, reach * 1.5 + pw + 210);
+        pipes.push({ x: px, w: pw });
+        if (cfg.pipes >= 0.34 && Math.random() < 0.45) {   // a second one to duck
+          const gap2 = 150 + Math.random() * 90;
+          pipes.push({ x: px + pw + gap2, w: pw });
+          seg.w += pw + gap2;
+        }
+      }
+      segs.push(seg);
+    }
+
+    function addSeg() {
+      const last = segs[segs.length - 1];
+      const x0 = last.x + last.w;
+      const cfg = levelConfig(level);
+      const reach = jumpReach();
+
+      // The first stretch of a new level is a breather.
+      if (pendingEasy > 0) {
+        pendingEasy--;
+        const g = reach * 0.34;
+        pushGap(x0, x0 + g, 30);
+        segs.push({ x: x0 + g, w: Math.max(340, speed * 0.95), y: GROUND_Y });
+        return;
+      }
+
+      // Crumbling slab: it starts going the moment you touch it. You come down
+      // a third of the way along and have until CRUMBLE_TIME to be off it —
+      // which lands you short of the next ledge unless you use the second jump.
+      if (cfg.crumble && Math.random() < cfg.crumble) {
+        const gA = reach * (0.52 + Math.random() * 0.06);
+        pushGap(x0, x0 + gA, 40);
+        segs.push({ x: x0 + gA, w: reach * 1.34, y: GROUND_Y, crumble: true, touched: false, timer: 0 });
+        const slabEnd = x0 + gA + reach * 1.34;
+        const gB = reach * (0.22 + Math.random() * 0.06);
+        pushGap(slabEnd, slabEnd + gB, 80);
+        addLanding(slabEnd + gB, cfg, reach * 0.55, false);
+        return;
+      }
+
+      // A hole too wide to cross in one go, with a stone to bounce off halfway.
+      // Everything is a fraction of the jump, so the stone always sits under the
+      // arc rather than just past the end of it.
+      if (cfg.stones && Math.random() < cfg.stones) {
+        const g1 = reach * (0.50 + Math.random() * 0.12);
+        const sw = reach * (0.42 + Math.random() * 0.12);
+        const sy = GROUND_Y - (55 + Math.random() * 25);
+        pushGap(x0, x0 + g1, 60);
+        segs.push({ x: x0 + g1, w: sw, y: sy, stone: true });
+        const stoneEnd = x0 + g1 + sw;
+        const g2 = reach * (0.85 + Math.random() * 0.15);
+        pushGap(stoneEnd, stoneEnd + g2, 90);
+        addLanding(stoneEnd + g2, cfg, reach * 1.15 - g2, false);
+        return;
+      }
+
+      gapCount++;
+      const big = cfg.bigEvery && gapCount % cfg.bigEvery === 0;
+      const g = big
+        ? reach * (cfg.bigMin + Math.random() * (cfg.bigMax - cfg.bigMin))
+        : reach * (cfg.gapMin + Math.random() * (cfg.gapMax - cfg.gapMin));
+      pushGap(x0, x0 + g, big ? 100 : 30);
+      // A wide hole is crossed with the double jump, whose length you choose by
+      // when you fire it — so its far side only needs room for the lazy version.
+      addLanding(x0 + g, cfg, big ? reach * 0.78 : reach - g, !big);
+    }
+
+    function extendTerrain() {
+      let guard = 0;
+      while (segs[segs.length - 1].x + segs[segs.length - 1].w < camX + W + 700 && guard++ < 40) addSeg();
+      while (segs.length > 1 && segs[0].x + segs[0].w < camX - 300) segs.shift();
+      while (gaps.length && gaps[0].x1 < camX - 300) gaps.shift();
+      while (spikes.length && spikes[0].x + spikes[0].w < camX - 300) spikes.shift();
+      while (pipes.length && pipes[0].x + pipes[0].w < camX - 300) pipes.shift();
+    }
+
+    // The highest surface crossed while falling from y0 to y1 at world x.
+    function landingSurface(x, y0, y1) {
+      let best = null;
+      for (const s of segs) {
+        if (x < s.x || x > s.x + s.w) continue;
+        if (y0 <= s.y + 1 && y1 >= s.y && (!best || s.y < best.y)) best = s;
+      }
+      return best;
+    }
+
+    function surfaceUnder(x) {
+      let best = null;
+      for (const s of segs) {
+        if (x >= s.x && x <= s.x + s.w && (!best || s.y < best.y)) best = s;
+      }
+      return best;
+    }
+
+    // --- input ----------------------------------------------------------------
+
+    function jumpPressed() {
+      if (!running || paused) return;
+      const p = player;
+      if (p.onGround || p.coyote > 0) {
+        p.vy = -JUMP_V; p.jumps = 1; p.onGround = false; p.coyote = 0; p.stand = null;
+        puff(6, "#8ea0c8");
+      } else if (p.jumps < 2) {
+        p.vy = -JUMP_V; p.jumps = 2; p.flip = 1;   // the flip is the double-jump tell
+        puff(9, "#22d3ee");
+      } else {
+        p.buffer = BUFFER;                          // too early — remember it briefly
+      }
+    }
+
+    function puff(n, color) {
+      for (let i = 0; i < n; i++) {
+        dust.push({
+          x: camX + PLAYER_X + (Math.random() - 0.5) * 14,
+          y: player.y - Math.random() * 8,
+          vx: -40 - Math.random() * 90, vy: -30 - Math.random() * 70,
+          r: 2 + Math.random() * 3, life: 0.5 + Math.random() * 0.35, max: 0.85, color,
+        });
+      }
+    }
+
+    // --- physics --------------------------------------------------------------
+
+    function update(dt) {
+      if (!running || paused) return;
+      const p = player;
+
+      camX += speed * dt;
+      dist += speed * dt;
+      extendTerrain();
+
+      p.crouch = !!crouchHeld;
+      const prevY = p.y;
+      // Crouching in mid-air is a dive — it gets you back on the ground sooner.
+      p.vy += GRAV * (p.crouch && !p.onGround ? 1.7 : 1) * dt;
+      p.y += p.vy * dt;
+      if (p.flip > 0) p.flip = Math.max(0, p.flip - dt / 0.42);
+      if (p.buffer > 0) p.buffer -= dt;
+
+      const footX = camX + PLAYER_X;
+
+      // ground that gives way once you have stood on it
+      for (const s of segs) {
+        if (!s.crumble || !s.touched) continue;
+        s.timer -= dt;
+      }
+      const dropped = segs.filter(s => s.crumble && s.touched && s.timer <= 0);
+      if (dropped.length) {
+        for (const s of dropped) {
+          segs.splice(segs.indexOf(s), 1);
+          if (p.stand === s) { p.stand = null; p.onGround = false; p.coyote = COYOTE; }
+        }
+      }
+
+      let landed = null;
+      if (!p.fell && p.vy >= 0) landed = landingSurface(footX, prevY, p.y);
+      if (landed) {
+        if (!p.onGround) puff(5, "#8ea0c8");        // landing dust
+        p.y = landed.y; p.vy = 0; p.jumps = 0; p.onGround = true; p.coyote = COYOTE;
+        p.stand = landed;
+        if (landed.crumble && !landed.touched) { landed.touched = true; landed.timer = CRUMBLE_TIME; }
+        if (p.buffer > 0) { p.buffer = 0; jumpPressed(); }
+      } else if (p.onGround) {
+        // still on the piece we were on, or just stepped off the end of it
+        const under = surfaceUnder(footX);
+        if (under && under === p.stand && Math.abs(p.y - under.y) < 1) {
+          p.vy = 0; p.y = under.y;
+        } else {
+          p.onGround = false; p.stand = null; p.coyote = COYOTE;
+        }
+      } else {
+        p.coyote = Math.max(0, p.coyote - dt);
+      }
+
+      // Below the main line with nothing under you: that hole has you.
+      if (p.y > GROUND_Y + 6) p.fell = true;
+
+      // pipes — your head has to clear the bottom of them, so you cannot be
+      // standing up and you certainly cannot be jumping
+      const headY = p.y - (p.crouch ? CROUCH_H : STAND_H);
+      for (const pi of pipes) {
+        if (footX + 7 > pi.x && footX - 8 < pi.x + pi.w && headY < PIPE_BOTTOM) {
+          gameOver("pipe");
+          return;
+        }
+      }
+
+      // spikes — your feet have to clear the tips
+      for (const sp of spikes) {
+        if (footX + 7 > sp.x && footX - 7 < sp.x + sp.w && p.y > sp.y - (SPIKE_H - 3)) {
+          gameOver("spike");
+          return;
+        }
+      }
+
+      // running animation + footfall dust
+      if (p.onGround) {
+        const before = p.phase;
+        p.phase += dt * speed * 0.045;
+        if (Math.floor(before / Math.PI) !== Math.floor(p.phase / Math.PI)) puff(2, "#6a7ba8");
+      }
+
+      for (const g of gaps) {
+        if (!g.scored && footX > g.x1 && !p.fell) {
+          g.scored = true;
+          score += g.bonus;
+          if (g.bonus >= 90) showToast("Nice jump!  +" + g.bonus);
+        }
+      }
+
+      for (const d of dust) { d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 300 * dt; d.life -= dt; }
+      dust = dust.filter(d => d.life > 0);
+
+      if (dist - levelStart >= levelLen) nextLevel();
+      if (p.y > H + 80) gameOver("hole");
+      updateStats();
+    }
+
+    function totalScore() { return score + Math.floor(dist / 20); }
+    const metres = () => Math.floor(dist / 20);
+
+    function updateStats() {
+      scoreEl.textContent = totalScore();
+      levelEl.textContent = level;
+      togoEl.textContent = Math.max(0, Math.ceil((levelLen - (dist - levelStart)) / 20)) + "m";
+    }
+
+    function showToast(text) {
+      toastEl.textContent = text;
+      toastEl.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove("show"), 1000);
+    }
+
+    function showBanner(title, note) {
+      bannerEl.innerHTML = title + (note ? "<small>" + note + "</small>" : "");
+      bannerEl.classList.add("show");
+      clearTimeout(bannerTimer);
+      bannerTimer = setTimeout(() => bannerEl.classList.remove("show"), 1700);
+    }
+
+    function startLevel(n) {
+      level = n;
+      levelStart = dist;
+      speed = levelConfig(n).speed;
+      levelLen = speed * LEVEL_SECONDS;
+      gapCount = 0;
+      pendingEasy = 1;
+      updateStats();
+    }
+
+    function nextLevel() {
+      score += 200 * level;
+      const n = level + 1;
+      startLevel(n);
+      showBanner("Level " + n, (LEVEL_NOTES[n] || "Faster!") + "  ·  +" + 200 * (n - 1));
+    }
+
+    // --- drawing --------------------------------------------------------------
+
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    function drawSky() {
+      const s = sky();
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, s.top);
+      g.addColorStop(0.6, s.mid);
+      g.addColorStop(1, s.bot);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.fillStyle = "rgba(255, 240, 200, 0.9)";
+      ctx.beginPath(); ctx.arc(W - 110, 62, 26, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255, 240, 200, 0.10)";
+      ctx.beginPath(); ctx.arc(W - 110, 62, 44, 0, Math.PI * 2); ctx.fill();
+
+      hills(0.22, 78, s.far, 210);
+      hills(0.45, 52, s.near, 232);
+    }
+
+    function hills(par, amp, color, baseY) {
+      const off = (camX * par) % 400;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(-10, H);
+      for (let x = -10; x <= W + 10; x += 10) {
+        const t = (x + off) / 400 * Math.PI * 2;
+        ctx.lineTo(x, baseY - amp * (0.5 + 0.5 * Math.sin(t)) - 10 * Math.sin(t * 2.7));
+      }
+      ctx.lineTo(W + 10, H);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawGround() {
+      const pal = sky();
+      for (const s of segs) {
+        const x = s.x - camX;
+        if (x > W || x + s.w < 0) continue;
+        const shake = s.crumble && s.touched ? (Math.random() - 0.5) * 3.5 : 0;
+        const y = s.y + shake;
+
+        if (s.stone) {
+          // a floating stepping stone
+          ctx.fillStyle = "rgba(0,0,0,0.25)";
+          roundRect(x + 6, y + 16, s.w - 12, 12, 6); ctx.fill();
+          ctx.fillStyle = "#6b7a8f";
+          roundRect(x, y, s.w, 26, 7); ctx.fill();
+          ctx.fillStyle = pal.grass;
+          roundRect(x, y, s.w, 6, 3); ctx.fill();
+          continue;
+        }
+
+        const h = H - s.y + 20;
+        ctx.fillStyle = s.crumble ? "#8a5a1e" : pal.dirt;
+        roundRect(x, y, s.w, h, 4); ctx.fill();
+        ctx.fillStyle = s.crumble ? "#f59e0b" : pal.grass;
+        roundRect(x, y, s.w, 6, 3); ctx.fill();
+        if (s.crumble) {                                  // cracks, so it reads as unsafe
+          ctx.strokeStyle = "rgba(0,0,0,0.4)";
+          ctx.lineWidth = 2;
+          for (let i = 1; i <= 3; i++) {
+            const cx = x + (s.w * i) / 4;
+            ctx.beginPath();
+            ctx.moveTo(cx, y + 8); ctx.lineTo(cx - 6, y + 24); ctx.lineTo(cx + 4, y + 40);
+            ctx.stroke();
+          }
+        }
+        ctx.fillStyle = "rgba(0,0,0,0.28)";
+        ctx.fillRect(x, y + 6, 4, h - 6);
+        ctx.fillRect(x + s.w - 4, y + 6, 4, h - 6);
+      }
+    }
+
+    function drawSpikes() {
+      for (const sp of spikes) {
+        const x = sp.x - camX;
+        if (x > W || x + sp.w < 0) continue;
+        const n = Math.max(2, Math.round(sp.w / 13));
+        const bw = sp.w / n;
+        for (let i = 0; i < n; i++) {
+          ctx.beginPath();
+          ctx.moveTo(x + i * bw, sp.y);
+          ctx.lineTo(x + i * bw + bw / 2, sp.y - SPIKE_H);
+          ctx.lineTo(x + (i + 1) * bw, sp.y);
+          ctx.closePath();
+          ctx.fillStyle = "#d9dee8";
+          ctx.fill();
+          ctx.strokeStyle = "#e94560";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      }
+    }
+
+    function drawPipes() {
+      for (const pi of pipes) {
+        const x = pi.x - camX;
+        if (x > W || x + pi.w < 0) continue;
+        const g = ctx.createLinearGradient(x, 0, x + pi.w, 0);
+        g.addColorStop(0, "#4a5568");
+        g.addColorStop(0.35, "#9aa5b5");
+        g.addColorStop(1, "#39414f");
+        ctx.fillStyle = g;
+        ctx.fillRect(x, -10, pi.w, PIPE_BOTTOM + 10);
+        // collar and warning stripe at the business end
+        ctx.fillStyle = "#2b3240";
+        ctx.fillRect(x - 5, PIPE_BOTTOM - 20, pi.w + 10, 20);
+        ctx.fillStyle = "#ffd23f";
+        for (let i = -5; i < pi.w + 10; i += 14) {
+          ctx.beginPath();
+          ctx.moveTo(x + i, PIPE_BOTTOM);
+          ctx.lineTo(x + i + 7, PIPE_BOTTOM - 20);
+          ctx.lineTo(x + i + 12, PIPE_BOTTOM - 20);
+          ctx.lineTo(x + i + 5, PIPE_BOTTOM);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.fillStyle = "rgba(0,0,0,0.35)";
+        ctx.fillRect(x - 5, PIPE_BOTTOM - 3, pi.w + 10, 3);
+      }
+    }
+
+    // The checkpoint that ends the level, sliding in from the right.
+    function drawLevelFlag() {
+      if (!running) return;
+      const x = PLAYER_X + (levelLen - (dist - levelStart));
+      if (x > W + 40 || x < -40) return;
+      ctx.strokeStyle = "rgba(255,210,63,0.35)";
+      ctx.setLineDash([7, 6]);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#ffd23f";
+      ctx.fillRect(x - 2, GROUND_Y - 96, 4, 96);
+      ctx.beginPath();
+      ctx.moveTo(x + 2, GROUND_Y - 96);
+      ctx.lineTo(x + 44, GROUND_Y - 84);
+      ctx.lineTo(x + 2, GROUND_Y - 70);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawDust() {
+      for (const d of dust) {
+        ctx.globalAlpha = Math.max(0, d.life / d.max) * 0.7;
+        ctx.fillStyle = d.color;
+        ctx.beginPath(); ctx.arc(d.x - camX, d.y, d.r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // A two-segment limb drawn from the hip/shoulder at (0,0).
+    function limb(thigh, knee, len, color, width, shoe) {
+      const kx = Math.sin(thigh) * len, ky = Math.cos(thigh) * len;
+      const fx = kx + Math.sin(thigh - knee) * len, fy = ky + Math.cos(thigh - knee) * len;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(kx, ky); ctx.lineTo(fx, fy);
+      ctx.stroke();
+      if (shoe) {
+        ctx.fillStyle = "#e94560";
+        ctx.beginPath(); ctx.ellipse(fx + 2, fy + 1, 5, 3.2, thigh - knee, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    function drawRunner() {
+      const p = player;
+      const under = surfaceUnder(camX + PLAYER_X);
+      if (under) {
+        const h = Math.max(0, under.y - p.y);
+        ctx.globalAlpha = Math.max(0.08, 0.34 - h / 700);
+        ctx.fillStyle = "#000";
+        ctx.beginPath();
+        ctx.ellipse(PLAYER_X, under.y + 4, Math.max(4, 16 - h / 40), 4.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.save();
+      ctx.translate(PLAYER_X, p.y - (p.crouch ? 18 : 28));   // pivot at the hips
+      if (p.flip > 0) ctx.rotate((1 - p.flip) * Math.PI * 2);
+
+      const air = !p.onGround;
+      const ph = p.phase;
+
+      if (p.crouch) {
+        // Hunched right down — head under the pipes, legs scurrying.
+        limb(1.15 + 0.25 * Math.sin(ph), 1.75, 11, "#22335e", 7, true);
+        limb(1.15 + 0.25 * Math.sin(ph + Math.PI), 1.75, 11, "#2b3a67", 7, true);
+        ctx.strokeStyle = "#22d3ee";
+        ctx.lineWidth = 11;
+        ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(9, -13); ctx.stroke();
+        ctx.save();
+        ctx.translate(7, -11);
+        limb(2.0, 0.9, 9, "#f5c396", 6, false);
+        ctx.restore();
+        ctx.fillStyle = "#f5c396";
+        ctx.beginPath(); ctx.arc(16, -18, 8.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#2b1b12";
+        ctx.beginPath(); ctx.arc(14, -20, 8.5, Math.PI * 0.85, Math.PI * 2.05); ctx.fill();
+        ctx.fillStyle = "#1a1a2e";
+        ctx.beginPath(); ctx.arc(21, -17, 1.7, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        return;
+      }
+
+      if (air) {
+        limb(0.95, 0.35, 14, "#2b3a67", 7, true);   // front leg reaching
+        limb(-0.65, 1.45, 14, "#22335e", 7, true);  // back leg tucked
+      } else {
+        limb(0.85 * Math.sin(ph), 0.9 * Math.max(0, Math.sin(ph + 1.5)), 14, "#22335e", 7, true);
+        limb(0.85 * Math.sin(ph + Math.PI), 0.9 * Math.max(0, Math.sin(ph + Math.PI + 1.5)), 14, "#2b3a67", 7, true);
+      }
+
+      ctx.strokeStyle = "#22d3ee";
+      ctx.lineWidth = 11;
+      ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -24); ctx.stroke();
+
+      ctx.save();
+      ctx.translate(0, -22);
+      if (air) {
+        limb(-2.4, -0.5, 11, "#f5c396", 6, false);
+        limb(2.5, 0.5, 11, "#f5c396", 6, false);
+      } else {
+        limb(Math.PI - 0.8 * Math.sin(ph), -0.7, 11, "#f5c396", 6, false);
+        limb(Math.PI + 0.8 * Math.sin(ph), -0.7, 11, "#f5c396", 6, false);
+      }
+      ctx.restore();
+
+      ctx.fillStyle = "#f5c396";
+      ctx.beginPath(); ctx.arc(1, -35, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#2b1b12";                    // hair, swept back by the wind
+      ctx.beginPath(); ctx.arc(1, -37, 9, Math.PI * 0.95, Math.PI * 2.15); ctx.fill();
+      ctx.fillStyle = "#1a1a2e";
+      ctx.beginPath(); ctx.arc(6, -35, 1.7, 0, Math.PI * 2); ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawHud() {
+      // jumps left
+      const left = running ? 2 - player.jumps : 2;
+      for (let i = 0; i < 2; i++) {
+        ctx.beginPath();
+        ctx.arc(24 + i * 20, 26, 7, 0, Math.PI * 2);
+        ctx.fillStyle = i < left ? "#22d3ee" : "rgba(255,255,255,0.12)";
+        ctx.fill();
+      }
+      // distance
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.font = "bold 15px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(metres() + "m", 60, 32);
+      // level progress
+      const bw = 200, bx = W / 2 - bw / 2;
+      const pct = Math.max(0, Math.min(1, (dist - levelStart) / levelLen));
+      ctx.fillStyle = "rgba(255,255,255,0.14)";
+      roundRect(bx, 19, bw, 9, 5); ctx.fill();
+      ctx.fillStyle = "#ffd23f";
+      roundRect(bx, 19, bw * pct, 9, 5); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = "bold 12px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("LEVEL " + level, W / 2, 45);
+
+      // A nudge when a pipe is bearing down and you are still standing up.
+      if (running && !player.crouch) {
+        const footX = camX + PLAYER_X;
+        const near = pipes.find(pi => pi.x + pi.w > footX && pi.x - footX < 300);
+        if (near) {
+          ctx.globalAlpha = 0.65 + 0.35 * Math.sin(Date.now() / 90);
+          ctx.fillStyle = "#ffd23f";
+          ctx.font = "bold 17px system-ui, sans-serif";
+          ctx.fillText("HOLD ↓", PLAYER_X, player.y - 92);
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    function draw() {
+      drawSky();
+      drawLevelFlag();
+      // A runner who has gone down a hole is drawn behind the line, so they
+      // disappear into it rather than sliding across the front of it.
+      if (player.fell) { drawRunner(); drawGround(); drawSpikes(); drawPipes(); drawDust(); }
+      else { drawGround(); drawSpikes(); drawDust(); drawRunner(); drawPipes(); }
+      drawHud();
+    }
+
+    function frame(t) {
+      const dt = lastFrame ? Math.min((t - lastFrame) / 1000, 0.05) : 0;
+      lastFrame = t;
+      update(dt);
+      draw();
+      raf = requestAnimationFrame(frame);
+    }
+
+    // --- game state -----------------------------------------------------------
+
+    function reset() {
+      segs = [{ x: -400, w: 1500, y: GROUND_Y }];   // a long, safe opening stretch
+      gaps = []; spikes = []; pipes = []; dust = [];
+      crouchHeld = false;
+      camX = 0; dist = 0; score = 0;
+      player = {
+        y: GROUND_Y, vy: 0, jumps: 0, onGround: true, stand: segs[0],
+        coyote: 0, buffer: 0, flip: 0, phase: 0, fell: false, crouch: false,
+      };
+      startLevel(1);
+      pendingEasy = 0;                             // the opening stretch is the breather
+      extendTerrain();
+    }
+
+    function startGame() {
+      running = true; paused = false; over = false; deathCause = null;
+      reset();
+      lastFrame = 0;
+      overlay.classList.add("hidden");
+    }
+
+    function gameOver(cause) {
+      if (over) return;
+      running = false; over = true; deathCause = cause;
+      const final = totalScore();
+      const prevBest = loadHigh();
+      pushRecord(HS_KEY, { score: final, date: Date.now(), mode: "Lv " + level + " · " + metres() + "m" });
+      overTitle.textContent =
+        cause === "spike" ? "🔺 Straight onto the spikes!" :
+        cause === "pipe" ? "🚧 Straight into the pipe!" : "🕳️ Down the hole!";
+      overSub.textContent = (final > prevBest
+        ? "🏆 New high score: " + final + "!"
+        : "Score: " + final + " · Best: " + prevBest) +
+        " · reached level " + level + " after " + metres() + "m";
+      if (final > prevBest) bestEl.textContent = final;
+      startBtn.textContent = "Run Again";
+      overlay.classList.remove("hidden");
+    }
+
+    function togglePause() {
+      if (!running) return;
+      paused = !paused;
+      if (paused) {
+        overTitle.textContent = "⏸ Paused";
+        overSub.textContent = "Press P or the button to get running again.";
+        startBtn.textContent = "Resume";
+        overlay.classList.remove("hidden");
+      } else {
+        overlay.classList.add("hidden");
+      }
+    }
+
+    // --- wiring ---------------------------------------------------------------
+
+    canvas.addEventListener("mousedown", e => {
+      if (e.button !== 0) return;                   // left click only
+      e.preventDefault();
+      if (!running) startGame(); else jumpPressed();
+    });
+    // Right mouse button is a second way to crouch, for anyone not on the keys.
+    canvas.addEventListener("mousedown", e => { if (e.button === 2) crouchHeld = true; });
+    document.addEventListener("mouseup", e => { if (e.button === 2) crouchHeld = false; });
+    canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+    // On a touchscreen the bottom of the canvas is the crouch pad, the rest jumps.
+    function touchesCrouching(list) {
+      const rect = canvas.getBoundingClientRect();
+      for (const t of list) if ((t.clientY - rect.top) / rect.height > 0.6) return true;
+      return false;
+    }
+    canvas.addEventListener("touchstart", e => {
+      e.preventDefault();
+      if (!running) { startGame(); return; }
+      if (touchesCrouching(e.changedTouches)) crouchHeld = true;
+      else jumpPressed();
+    }, { passive: false });
+    canvas.addEventListener("touchend", e => { crouchHeld = touchesCrouching(e.touches); });
+    canvas.addEventListener("touchcancel", () => { crouchHeld = false; });
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "p" || e.key === "P" || e.key === "Escape") { togglePause(); return; }
+      if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        crouchHeld = true;
+        return;
+      }
+      if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "Enter") {
+        e.preventDefault();
+        if (!running) startGame(); else jumpPressed();
+      }
+    });
+    document.addEventListener("keyup", e => {
+      if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") crouchHeld = false;
+    });
+
+    startBtn.addEventListener("click", () => {
+      if (paused) togglePause(); else startGame();
+    });
+
+    // initial paint behind the start overlay
+    running = false; paused = false; over = false;
+    reset();
+    bestEl.textContent = loadHigh();
+    raf = requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
