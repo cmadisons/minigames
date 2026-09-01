@@ -15,6 +15,10 @@ Tap **Play** to run it. Tap **Code** to read how it works.
 | 🧱 Tetris | [▶️ Play](https://cmadisons.github.io/minigames/tetris.html) | [📄 Code](tetris.html) |
 | ⬡ Hexagon Fall | [▶️ Play](https://cmadisons.github.io/minigames/hexagon-fall.html) | [📄 Code](hexagon-fall.html) |
 | 🏃 Gap Runner | [▶️ Play](https://cmadisons.github.io/minigames/runner.html) | [📄 Code](runner.html) |
+| 🧮 2048 | [▶️ Play](https://cmadisons.github.io/minigames/2048.html) | [📄 Code](2048.html) |
+| 🦘 Doodle Jump | [▶️ Play](https://cmadisons.github.io/minigames/doodle-jump.html) | [📄 Code](doodle-jump.html) |
+| 🏰 Tower Defense | [▶️ Play](https://cmadisons.github.io/minigames/tower-defense.html) | [📄 Code](tower-defense.html) |
+| ♟️ Chess | [▶️ Play](https://cmadisons.github.io/minigames/chess.html) | [📄 Code](chess.html) |
 | 🏝️ Sky Blocks | [▶️ Play](https://cmadisons.github.io/minigames/skyblocks.html) | [📄 Code](skyblocks.html) |
 | 🦔 Whack-a-Hedgehog | [▶️ Play](https://cmadisons.github.io/minigames/hedgehog.html) | [📄 Code](hedgehog.html) |
 | 🧠 Memory | [▶️ Play](https://cmadisons.github.io/minigames/memory.html) | [📄 Code](memory.html) |

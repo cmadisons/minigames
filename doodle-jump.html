@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doodle Jump</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --panel: #16213e;
+      --text: #eaeaea;
+      --muted: #999;
+      --accent: #e94560;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 72px 12px 24px;
+      text-align: center;
+    }
+    h1 { margin: 4px 0 12px; font-size: 1.8rem; }
+
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 52px;
+      display: flex; align-items: center; gap: 12px; padding: 0 12px;
+      background: rgba(22,33,62,0.95); backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 200;
+    }
+    .topbar .back {
+      text-decoration: none; color: #eaeaea; font-size: 1.2rem; line-height: 1;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 7px 13px; flex-shrink: 0;
+    }
+    .topbar .back:hover { border-color: var(--accent); }
+
+    .stats { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; justify-content: center; }
+    .stat { padding: 6px 16px; border-radius: 12px; background: var(--panel); min-width: 88px; }
+    .stat .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+    .stat .value { font-size: 1.5rem; font-weight: bold; }
+    #score-value { color: #22d3ee; }
+    #best-value { color: var(--accent); }
+    #height-value { color: #4ade80; }
+
+    .wrap { position: relative; line-height: 0; }
+    #board {
+      display: block;
+      width: min(92vw, 400px);
+      height: auto;
+      border-radius: 12px;
+      background: #10182f;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+      touch-action: none;
+    }
+    .overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(10, 15, 35, 0.88);
+      border-radius: 12px; gap: 12px; padding: 20px; z-index: 60; line-height: 1.45;
+    }
+    .overlay.hidden { display: none; }
+    .overlay .big { font-size: 1.35rem; font-weight: bold; }
+    .overlay .sub { color: #bbb; font-size: 0.88rem; max-width: 290px; line-height: 1.6; }
+    .overlay .keys { color: var(--muted); font-size: 0.78rem; line-height: 1.7; }
+
+    .btn {
+      padding: 11px 24px; font-size: 1rem; color: #fff;
+      background: var(--accent); border: none; border-radius: 10px; cursor: pointer;
+    }
+    .btn:hover { opacity: 0.9; }
+
+    /* On-screen pad — only for touch devices, where there is no keyboard */
+    .pad { display: none; gap: 8px; margin-top: 14px; justify-content: center; }
+    .pad button {
+      width: 72px; height: 52px; font-size: 1.2rem; color: var(--text);
+      background: var(--panel); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px; cursor: pointer; touch-action: manipulation; user-select: none;
+    }
+    .pad button:active { border-color: var(--accent); }
+    @media (hover: none) { .pad { display: flex; } }
+
+    .hint { color: #888; font-size: 0.85rem; margin-top: 14px; max-width: 480px; line-height: 1.6; }
+    .hint .k { color: #c6cce0; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <nav class="topbar">
+    <a class="back" href="index.html" title="Back to home">← Home</a>
+  </nav>
+
+  <h1>🦘 Doodle Jump</h1>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="label">Score</div>
+      <div class="value" id="score-value">0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Height</div>
+      <div class="value" id="height-value">0m</div>
+    </div>
+    <div class="stat">
+      <div class="label">Best</div>
+      <div class="value" id="best-value">0</div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <canvas id="board" width="400" height="620"></canvas>
+    <div class="overlay" id="overlay">
+      <div class="big" id="over-title">🦘 Doodle Jump</div>
+      <div class="sub" id="over-sub">
+        You bounce on your own — all you do is steer. Climb as high as you can
+        and don't fall off the bottom.
+      </div>
+      <div class="keys">
+        <strong>←</strong> <strong>→</strong> steer · <strong>Space</strong> shoot ·
+        you wrap around the edges
+      </div>
+      <button class="btn" id="start">Start Game</button>
+    </div>
+  </div>
+
+  <div class="pad">
+    <button data-act="left">◀</button>
+    <button data-act="shoot">💥</button>
+    <button data-act="right">▶</button>
+  </div>
+
+  <p class="hint">
+    <span class="k">←</span> <span class="k">→</span> or <span class="k">A</span>/<span class="k">D</span>
+    to steer, <span class="k">Space</span> or <span class="k">↑</span> to shoot.
+    Green platforms are solid · <span style="color:#60a5fa">blue</span> ones slide ·
+    <span style="color:#c08457">brown</span> ones crumble · <span style="color:#cbd5e1">pale</span> ones
+    vanish once you use them. Grab a <strong>spring</strong> for a big bounce or a
+    <strong>propeller</strong> to fly. Land on a monster's head or shoot it — anything else kills you.
+  </p>
+
+  <script>
+    const W = 400, H = 620;
+    const HS_KEY = "records-doodle-jump";   // shared leaderboard format the menu reads
+
+    const GRAVITY = 1750;        // px/s²
+    const JUMP_V = -760;         // launch speed off a normal platform
+    const SPRING_V = -1320;
+    const PROP_V = -560;         // steady climb while the propeller runs
+    const PROP_TIME = 1.7;       // seconds of propeller
+    const MOVE_ACCEL = 2600;
+    const MOVE_MAX = 400;
+    const FRICTION = 0.86;
+    const PLAT_W = 68, PLAT_H = 14;
+    const PLAYER_W = 34, PLAYER_H = 38;
+    const BULLET_V = -980;
+    const SHOOT_COOLDOWN = 0.28;
+    const FULL_DIFFICULTY = 14000;   // height in px at which the game stops getting harder
+
+    const canvas = document.getElementById("board");
+    const ctx = canvas.getContext("2d");
+    const overlay = document.getElementById("overlay");
+    const overTitle = document.getElementById("over-title");
+    const overSub = document.getElementById("over-sub");
+    const startBtn = document.getElementById("start");
+    const scoreEl = document.getElementById("score-value");
+    const heightEl = document.getElementById("height-value");
+    const bestEl = document.getElementById("best-value");
+
+    let player, platforms, bullets, monsters, particles;
+    let camY, topY, minY, score, kills;
+    let running = false, dead = false;
+    let moveDir = 0, shootHeld = false, shootTimer = 0;
+    let raf = 0, lastFrame = 0;
+
+    // Records are stored as an array of {score, date}; the menu shows the top 10.
+    function pushRecord(key, entry) {
+      let a; try { a = JSON.parse(localStorage.getItem(key)) || []; } catch (e) { a = []; }
+      a.push(entry); if (a.length > 50) a = a.slice(-50);
+      localStorage.setItem(key, JSON.stringify(a));
+    }
+    function loadHigh() {
+      let a; try { a = JSON.parse(localStorage.getItem(HS_KEY)) || []; } catch (e) { a = []; }
+      return a.reduce((m, r) => (r && r.score > m ? r.score : m), 0);
+    }
+
+    function rnd(a, b) { return a + Math.random() * (b - a); }
+
+    // 0 at the start, 1 once you are high enough that everything is as hard as
+    // it gets. Every generator below reads from this.
+    function difficulty() {
+      return Math.min(1, Math.max(0, (-minY) / FULL_DIFFICULTY));
+    }
+
+    // --- world generation ---
+
+    function makePlatform(y) {
+      const d = difficulty();
+      // Weights shift from all-solid toward the awkward kinds as you climb.
+      const weights = [
+        ["normal", 100 - 52 * d],
+        ["moving", 8 + 30 * d],
+        ["crumble", 4 + 26 * d],
+        ["vanish", 3 + 22 * d],
+      ];
+      let total = 0;
+      for (const w of weights) total += w[1];
+      let roll = Math.random() * total, kind = "normal";
+      for (const [k, v] of weights) { roll -= v; if (roll <= 0) { kind = k; break; } }
+
+      const p = {
+        x: rnd(4, W - PLAT_W - 4), y: y, w: PLAT_W, kind: kind,
+        vx: kind === "moving" ? rnd(50, 90) * (Math.random() < 0.5 ? -1 : 1) : 0,
+        used: false, alpha: 1,
+      };
+
+      // Boosters only sit on platforms that will still be there when you land.
+      if (kind === "normal" || kind === "moving") {
+        const r = Math.random();
+        if (r < 0.055) p.item = "spring";
+        else if (r < 0.075) p.item = "propeller";
+      }
+      return p;
+    }
+
+    function addMonster(y) {
+      const kinds = ["👾", "👹", "🐛"];
+      monsters.push({
+        x: rnd(30, W - 60), y: y, w: 34, h: 30,
+        glyph: kinds[Math.floor(Math.random() * kinds.length)],
+        vx: Math.random() < 0.45 ? rnd(35, 70) * (Math.random() < 0.5 ? -1 : 1) : 0,
+      });
+    }
+
+    // Keep filling in platforms above the top of the view as the camera climbs.
+    function generateAbove() {
+      const d = difficulty();
+      while (topY > camY - 240) {
+        const gap = rnd(62 + 44 * d, 96 + 74 * d);
+        topY -= gap;
+        platforms.push(makePlatform(topY));
+        // Monsters only start showing up once you are properly climbing.
+        if (-topY > 1600 && Math.random() < 0.03 + 0.09 * d) addMonster(topY - rnd(40, 90));
+      }
+    }
+
+    // --- setup ---
+
+    function reset() {
+      player = { x: W / 2, y: 0, vx: 0, vy: JUMP_V, prevY: 0, prop: 0, face: 1 };
+      platforms = [];
+      bullets = [];
+      monsters = [];
+      particles = [];
+      camY = -H * 0.62;
+      minY = 0;
+      score = 0; kills = 0;
+      dead = false;
+
+      // A wide starting platform right under the player, then a normal spread.
+      platforms.push({ x: W / 2 - 50, y: 60, w: 100, kind: "normal", vx: 0, used: false, alpha: 1 });
+      topY = 60;
+      for (let i = 0; i < 12; i++) {
+        topY -= rnd(62, 96);
+        platforms.push(makePlatform(topY));
+      }
+      generateAbove();
+    }
+
+    // --- simulation ---
+
+    function update(dt) {
+      const p = player;
+      p.prevY = p.y;
+
+      // horizontal steering
+      if (moveDir) { p.vx += moveDir * MOVE_ACCEL * dt; p.face = moveDir; }
+      else p.vx *= Math.pow(FRICTION, dt * 60);
+      p.vx = Math.max(-MOVE_MAX, Math.min(MOVE_MAX, p.vx));
+      p.x += p.vx * dt;
+      // wrap around the sides
+      if (p.x < -PLAYER_W / 2) p.x = W + PLAYER_W / 2;
+      if (p.x > W + PLAYER_W / 2) p.x = -PLAYER_W / 2;
+
+      // vertical
+      if (p.prop > 0) {
+        p.prop -= dt;
+        p.vy = PROP_V;
+      } else {
+        p.vy += GRAVITY * dt;
+      }
+      p.y += p.vy * dt;
+
+      // platforms
+      for (const pl of platforms) {
+        if (pl.vx) {
+          pl.x += pl.vx * dt;
+          if (pl.x < 2) { pl.x = 2; pl.vx *= -1; }
+          if (pl.x + pl.w > W - 2) { pl.x = W - 2 - pl.w; pl.vx *= -1; }
+        }
+        if (pl.falling) { pl.y += 420 * dt; pl.alpha -= dt * 1.6; }
+        if (pl.fading) pl.alpha -= dt * 2.6;
+      }
+
+      // landing: only while falling, and only if the feet crossed the platform
+      // top this frame — otherwise you would snag platforms on the way up.
+      if (p.vy > 0 && p.prop <= 0) {
+        const feetPrev = p.prevY + PLAYER_H / 2;
+        const feet = p.y + PLAYER_H / 2;
+        for (const pl of platforms) {
+          if (pl.falling || pl.alpha <= 0) continue;
+          if (feetPrev > pl.y || feet < pl.y) continue;
+          if (p.x + PLAYER_W / 2 < pl.x || p.x - PLAYER_W / 2 > pl.x + pl.w) continue;
+          land(pl);
+          break;
+        }
+      }
+
+      // items and monsters
+      for (const m of monsters) {
+        if (m.vx) {
+          m.x += m.vx * dt;
+          if (m.x < 2 || m.x + m.w > W - 2) m.vx *= -1;
+        }
+        if (m.dead) continue;
+        const hit = Math.abs(p.x - (m.x + m.w / 2)) < (PLAYER_W + m.w) / 2 - 6 &&
+                    Math.abs(p.y - (m.y + m.h / 2)) < (PLAYER_H + m.h) / 2 - 6;
+        if (!hit) continue;
+        // Coming down on its head squashes it; anything else is fatal.
+        if (p.vy > 0 && p.prevY + PLAYER_H / 2 <= m.y + 10) {
+          squash(m);
+          p.vy = JUMP_V * 0.85;
+        } else if (p.prop <= 0) {
+          die();
+          return;
+        }
+      }
+
+      // bullets
+      shootTimer -= dt;
+      if (shootHeld && shootTimer <= 0) shoot();
+      for (const b of bullets) {
+        b.y += BULLET_V * dt;
+        if (b.y < camY - 40) { b.gone = true; continue; }
+        for (const m of monsters) {
+          if (m.dead) continue;
+          if (b.x > m.x && b.x < m.x + m.w && b.y > m.y && b.y < m.y + m.h) {
+            squash(m); b.gone = true; break;
+          }
+        }
+      }
+
+      for (const s of particles) {
+        s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 900 * dt; s.ttl -= dt;
+      }
+
+      // camera only ever rises
+      const target = p.y - H * 0.45;
+      if (target < camY) camY = target;
+      if (p.y < minY) minY = p.y;
+
+      // cull and regenerate
+      const floor = camY + H + 120;
+      platforms = platforms.filter(pl => pl.y < floor && pl.alpha > 0);
+      monsters = monsters.filter(m => m.y < floor && !m.gone);
+      bullets = bullets.filter(b => !b.gone);
+      particles = particles.filter(s => s.ttl > 0);
+      generateAbove();
+
+      score = Math.floor(-minY / 10) + kills * 50;
+
+      // fell off the bottom
+      if (p.y - camY > H + 60) die();
+    }
+
+    function land(pl) {
+      const p = player;
+      p.y = pl.y - PLAYER_H / 2;
+
+      if (pl.item === "spring") {
+        p.vy = SPRING_V;
+        pl.item = null;
+        burst(p.x, pl.y, "#ffd23f", 10);
+      } else if (pl.item === "propeller") {
+        p.prop = PROP_TIME;
+        p.vy = PROP_V;
+        pl.item = null;
+        burst(p.x, pl.y, "#c084fc", 12);
+      } else {
+        p.vy = JUMP_V;
+      }
+
+      if (pl.kind === "crumble") {
+        pl.falling = true;       // gives way underfoot
+        p.vy = JUMP_V * 0.55;    // and robs you of most of the bounce
+      } else if (pl.kind === "vanish" && !pl.used) {
+        pl.used = true;
+        pl.fading = true;
+      }
+    }
+
+    function squash(m) {
+      m.dead = true; m.gone = true;
+      kills++;
+      burst(m.x + m.w / 2, m.y + m.h / 2, "#e94560", 14);
+    }
+
+    function shoot() {
+      shootTimer = SHOOT_COOLDOWN;
+      bullets.push({ x: player.x, y: player.y - PLAYER_H / 2 });
+    }
+
+    function burst(x, y, colour, n) {
+      for (let i = 0; i < n; i++) {
+        particles.push({
+          x, y, vx: rnd(-160, 160), vy: rnd(-260, -40),
+          ttl: rnd(0.3, 0.7), max: 0.7, colour,
+        });
+      }
+    }
+
+    // --- drawing ---
+
+    const PLAT_COLOURS = {
+      normal:  ["#4ade80", "#22a95a"],
+      moving:  ["#60a5fa", "#2563eb"],
+      crumble: ["#c08457", "#8a5a34"],
+      vanish:  ["#cbd5e1", "#94a3b8"],
+    };
+
+    function draw() {
+      // sky
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#101a35");
+      g.addColorStop(1, "#1b2748");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+
+      // parallax stars, tied to the camera so they drift as you climb
+      ctx.fillStyle = "rgba(255,255,255,0.16)";
+      for (let i = 0; i < 40; i++) {
+        const sx = (i * 97) % W;
+        const sy = ((i * 61 - camY * 0.25) % (H + 40) + H + 40) % (H + 40) - 20;
+        ctx.fillRect(sx, sy, 2, 2);
+      }
+
+      ctx.save();
+      ctx.translate(0, -camY);
+
+      for (const pl of platforms) drawPlatform(pl);
+
+      for (const m of monsters) {
+        if (m.dead) continue;
+        ctx.font = "28px serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(m.glyph, m.x + m.w / 2, m.y + m.h / 2);
+      }
+
+      ctx.fillStyle = "#ffd23f";
+      for (const b of bullets) {
+        ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI * 2); ctx.fill();
+      }
+
+      for (const s of particles) {
+        ctx.globalAlpha = Math.max(0, s.ttl / s.max);
+        ctx.fillStyle = s.colour;
+        ctx.fillRect(s.x - 2, s.y - 2, 4, 4);
+        ctx.globalAlpha = 1;
+      }
+
+      if (!dead) drawPlayer();
+      ctx.restore();
+    }
+
+    function drawPlatform(pl) {
+      const [top, bottom] = PLAT_COLOURS[pl.kind];
+      ctx.globalAlpha = Math.max(0, pl.alpha);
+      ctx.fillStyle = bottom;
+      roundRect(pl.x, pl.y, pl.w, PLAT_H, 6);
+      ctx.fill();
+      ctx.fillStyle = top;
+      roundRect(pl.x, pl.y, pl.w, PLAT_H - 5, 6);
+      ctx.fill();
+      // crumbling platforms show a crack so you can read them at a glance
+      if (pl.kind === "crumble") {
+        ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(pl.x + pl.w * 0.4, pl.y);
+        ctx.lineTo(pl.x + pl.w * 0.5, pl.y + PLAT_H);
+        ctx.stroke();
+      }
+      if (pl.item === "spring") {
+        ctx.fillStyle = "#ffd23f";
+        ctx.fillRect(pl.x + pl.w / 2 - 6, pl.y - 9, 12, 9);
+        ctx.strokeStyle = "#8a6d10"; ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          ctx.moveTo(pl.x + pl.w / 2 - 6, pl.y - 2 - i * 3);
+          ctx.lineTo(pl.x + pl.w / 2 + 6, pl.y - 4 - i * 3);
+        }
+        ctx.stroke();
+      } else if (pl.item === "propeller") {
+        ctx.fillStyle = "#c084fc";
+        ctx.fillRect(pl.x + pl.w / 2 - 2, pl.y - 10, 4, 10);
+        ctx.fillRect(pl.x + pl.w / 2 - 11, pl.y - 12, 22, 3);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawPlayer() {
+      const p = player;
+      const x = p.x, y = p.y;
+
+      if (p.prop > 0) {
+        // spinning propeller — the blur direction flips every few frames
+        ctx.fillStyle = "#c084fc";
+        ctx.fillRect(x - 2, y - PLAYER_H / 2 - 12, 4, 12);
+        const spin = Math.sin(performance.now() / 22) * 13;
+        ctx.fillRect(x - spin, y - PLAYER_H / 2 - 14, spin * 2, 3);
+      }
+
+      // body
+      ctx.fillStyle = "#22d3ee";
+      ctx.beginPath();
+      ctx.ellipse(x, y, PLAYER_W / 2, PLAYER_H / 2 - 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // feet, pointing whichever way you are steering
+      ctx.fillStyle = "#0e7490";
+      ctx.fillRect(x + (p.face > 0 ? 2 : -12), y + PLAYER_H / 2 - 8, 10, 7);
+      // eyes
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(x - 6, y - 6, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 6, y - 6, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#10233a";
+      ctx.beginPath(); ctx.arc(x - 6 + p.face * 1.6, y - 6, 2.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 6 + p.face * 1.6, y - 6, 2.4, 0, Math.PI * 2); ctx.fill();
+      // grin
+      ctx.strokeStyle = "#0e7490"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y + 3, 6, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    }
+
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    // --- hud ---
+
+    let shownScore = -1, shownHeight = -1;
+    function updateHud() {
+      if (score !== shownScore) { scoreEl.textContent = score; shownScore = score; }
+      const m = Math.floor(-minY / 10);
+      if (m !== shownHeight) { heightEl.textContent = m + "m"; shownHeight = m; }
+    }
+
+    // --- game flow ---
+
+    function die() {
+      if (dead) return;
+      dead = true;
+      running = false;
+      const height = Math.floor(-minY / 10);
+      const prevBest = loadHigh();
+      pushRecord(HS_KEY, { score: score, date: Date.now(), mode: height + "m" });
+      overTitle.textContent = "💀 You fell";
+      overSub.textContent = (score > prevBest ? "🏆 New high score: " + score + "! " : "Score " + score + " · best " + prevBest + ". ") +
+        "You climbed " + height + "m" + (kills ? " and squashed " + kills + " monster" + (kills === 1 ? "" : "s") : "") + ".";
+      startBtn.textContent = "Play Again";
+      overlay.classList.remove("hidden");
+      bestEl.textContent = Math.max(prevBest, score);
+      updateHud();
+    }
+
+    function newGame() {
+      reset();
+      running = true;
+      moveDir = 0; shootHeld = false; shootTimer = 0;
+      shownScore = -1; shownHeight = -1;
+      overlay.classList.add("hidden");
+      bestEl.textContent = loadHigh();
+      updateHud();
+    }
+
+    function loop(now) {
+      raf = requestAnimationFrame(loop);
+      let dt = (now - lastFrame) / 1000 || 0;
+      lastFrame = now;
+      if (running && !dead) {
+        // Cap the step and run it in slices: at 400+ px/s a single long frame
+        // could carry the player straight through a platform.
+        dt = Math.min(dt, 0.05);
+        const steps = Math.ceil(dt / 0.008);
+        for (let i = 0; i < steps && running && !dead; i++) update(dt / steps);
+        updateHud();
+      }
+      draw();
+    }
+
+    // --- input ---
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") { moveDir = -1; e.preventDefault(); }
+      else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") { moveDir = 1; e.preventDefault(); }
+      else if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
+        shootHeld = true; e.preventDefault();
+        if (!running && !dead) newGame();
+      }
+    });
+    document.addEventListener("keyup", e => {
+      if ((e.key === "ArrowLeft" || e.key === "a" || e.key === "A") && moveDir === -1) moveDir = 0;
+      if ((e.key === "ArrowRight" || e.key === "d" || e.key === "D") && moveDir === 1) moveDir = 0;
+      if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") shootHeld = false;
+    });
+
+    // Steering by dragging works better on a phone than tapping buttons, so the
+    // canvas follows your finger and the pad is there as a backup.
+    canvas.addEventListener("pointerdown", e => {
+      if (!running) return;
+      canvas.setPointerCapture(e.pointerId);
+      steerTo(e);
+    });
+    canvas.addEventListener("pointermove", e => {
+      if (!running || !e.buttons) return;
+      steerTo(e);
+    });
+    canvas.addEventListener("pointerup", () => { moveDir = 0; });
+    function steerTo(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (W / rect.width);
+      moveDir = x < player.x - 12 ? -1 : x > player.x + 12 ? 1 : 0;
+    }
+
+    document.querySelectorAll(".pad button").forEach(b => {
+      const act = b.dataset.act;
+      const on = e => {
+        e.preventDefault();
+        if (act === "left") moveDir = -1;
+        else if (act === "right") moveDir = 1;
+        else shootHeld = true;
+      };
+      const off = e => {
+        e.preventDefault();
+        if (act === "shoot") shootHeld = false;
+        else moveDir = 0;
+      };
+      b.addEventListener("pointerdown", on);
+      b.addEventListener("pointerup", off);
+      b.addEventListener("pointerleave", off);
+      b.addEventListener("pointercancel", off);
+    });
+
+    startBtn.addEventListener("click", newGame);
+
+    // --- boot ---
+    reset();
+    bestEl.textContent = loadHigh();
+    updateHud();
+    lastFrame = performance.now();
+    raf = requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
