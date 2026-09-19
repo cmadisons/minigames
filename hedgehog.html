@@ -159,6 +159,7 @@
   #speedBtn { background: linear-gradient(#b6ff6a,#5fbf2f); color: #143f04; box-shadow: 0 5px 0 #3d8a1d; }
   #gearRow { display: flex; gap: 10px; align-items: center; font-weight: bold; font-size: 16px; }
   #gearRow button { font-size: 18px; padding: 8px 16px; }
+  #premiumNote { font-size: 13px; font-weight: bold; color: #bfefff; opacity: .85; }
 
   #bombChoice h2, #sonicChoice h2 { font-size: 36px; } #chest h2 { font-size: 34px; }
   #bombChoice p, #sonicChoice p, #chest p { font-size: 18px; opacity: .92; }
@@ -279,6 +280,7 @@
     </div>
     <div class="menu" id="unlockRow"></div>
     <div id="gearRow"></div>
+    <div id="premiumNote" class="hidden">💎 Premium: everything unlocked</div>
     <div id="boardTabs">
       <button data-b="classic">Classic</button>
       <button data-b="most">Most Sonics</button>
@@ -382,7 +384,7 @@
   const gridEl=$('grid'), hammer=$('hammer'), overlay=$('overlay'), introEl=$('intro'), boardEl=$('board'),
         boardTabs=$('boardTabs'), timerPill=$('timerPill'), pointsPill=$('pointsPill'), speedPill=$('speedPill'),
         streakPill=$('streakPill'), startBtn=$('startBtn'), mostBtn=$('mostBtn'), speedBtn=$('speedBtn'),
-        unlockRow=$('unlockRow'), gearRow=$('gearRow'), bossEl=$('boss'), bossHearts=$('bossHearts'), bossFace=$('bossFace'),
+        unlockRow=$('unlockRow'), gearRow=$('gearRow'), premiumNote=$('premiumNote'), bossEl=$('boss'), bossHearts=$('bossHearts'), bossFace=$('bossFace'),
         bombChoice=$('bombChoice'), loseSecBtn=$('loseSec'), losePtsBtn=$('losePts'),
         sonicChoice=$('sonicChoice'), gainSecBtn=$('gainSec'), gainPtsBtn=$('gainPts'),
         chest=$('chest'), chestGrid=$('chestGrid'), chestMsg=$('chestMsg'), chestClose=$('chestClose'),
@@ -454,15 +456,45 @@
     } catch (e) { return defaultUnlocks(); }
   }
   function saveUnlocks() { try { localStorage.setItem(UNLOCK_KEY, JSON.stringify(unlocks)); } catch (e) {} }
-  function isSaber() { return unlocks.equipped === 'saber'; }
-  function isBetter(id) { return unlocks.equipped === id; }
+  function isSaber() { return curEquipped() === 'saber'; }
+  function isBetter(id) { return curEquipped() === id; }
   function hammerGlyph(v) { return SPECIAL_HAMMER[v] || v; }
-  function setHammer() { hammer.textContent = hammerGlyph(unlocks.equipped); hammer.classList.toggle('saberhammer', !!SPECIAL_HAMMER[unlocks.equipped]); }
+  function setHammer() { const eq = curEquipped(); hammer.textContent = hammerGlyph(eq); hammer.classList.toggle('saberhammer', !!SPECIAL_HAMMER[eq]); }
   function addMoney(n) { if (unlocks.emerald) n *= 2; unlocks.money = (unlocks.money || 0) + n; saveUnlocks(); updateMoneyHud(); }
   function updateMoneyHud() { moneyHud.textContent = '💵 $' + (unlocks.money || 0); }
-  function setHat() { if (unlocks.hat) { hatEl.textContent = unlocks.hat; hatEl.classList.remove('hidden'); } else hatEl.classList.add('hidden'); }
-  function powerOn(name) { return !!(unlocks.powers[name] && unlocks.powersOn[name] !== false); }
+  function setHat() { const ht = curHat(); if (ht) { hatEl.textContent = ht; hatEl.classList.remove('hidden'); } else hatEl.classList.add('hidden'); }
+  function powerOn(name) { return !!(hasPower(name) && unlocks.powersOn[name] !== false); }
   function upMul() { return powerOn('slowMo') ? 1.35 : 1; }
+
+  // ---------- 💎 Premium: everything unlocked while it's active ----------
+  // A read-only overlay on top of the real save: nothing Premium grants is ever written into hh_unlocks,
+  // so when Premium ends you're back to exactly what you earned (and anything you earned meanwhile is kept).
+  // Premium-only picks (an equipped hammer/hat you don't own, would-you-rather choices) live in hh_premium.
+  function isPremium(){ try { return +localStorage.getItem('squarebox:premiumUntil') > Date.now(); } catch(e){ return false; } }
+  const PREM_KEY = 'hh_premium';
+  function loadPrem() { try { return Object.assign({ equipped: null, hat: null, wyr: {} }, JSON.parse(localStorage.getItem(PREM_KEY) || '{}')); } catch (e) { return { equipped: null, hat: null, wyr: {} }; } }
+  function savePrem() { try { localStorage.setItem(PREM_KEY, JSON.stringify(prem)); } catch (e) {} }
+  let prem = loadPrem();
+  const ALL_HAMMERS = HAMMER_POOL.concat(BETTER_HAMMERS.map(b => b.id), STORE_HAMMERS.map(s => s.id), ['emerald']);
+  function premOr(v) { return isPremium() || !!v; }
+  function allHammers() { return isPremium() ? unlocks.hammers.concat(ALL_HAMMERS.filter(h => !unlocks.hammers.includes(h))) : unlocks.hammers; }
+  function allHats() { return isPremium() ? unlocks.hats.concat(HAT_POOL.filter(h => !unlocks.hats.includes(h))) : unlocks.hats; }
+  function curEquipped() { return (isPremium() && prem.equipped) || unlocks.equipped; }
+  function curHat() { return (isPremium() && prem.hat) || unlocks.hat; }
+  function equip(h) { unlocks.equipped = h; if (prem.equipped) { prem.equipped = null; savePrem(); } setHammer(); }   // earning/buying a hammer equips it
+  function wearHat(h) { unlocks.hat = h; if (prem.hat) { prem.hat = null; savePrem(); } setHat(); }
+  function hasGrid(g) { return premOr(unlocks.grids[g]); }
+  function hasMode(m) { return premOr(unlocks.modes[m]); }
+  function tierOpen(t) { if (isPremium()) return true;                        // rare / gold / diamond keys appear in the game
+    if (t === 'rareKey') return (unlocks.keysEarned || 0) >= CONFIG.rareKeyGate || unlocks.rareUnlocked;
+    return t === 'goldKey' ? unlocks.goldUnlocked : unlocks.diamondUnlocked; }
+  function tradeOpen(kind) { return isPremium() || gridsDone(kind); }          // store buys/trades up the key tiers
+  function wyrIndex(id) { return WYR_PAIRS.findIndex(p => p[0].id === id || p[1].id === id); }
+  function wyrEarned(i) { return !!(unlocks.powers[WYR_PAIRS[i][0].id] || unlocks.powers[WYR_PAIRS[i][1].id]); }
+  function hasPower(id) { if (unlocks.powers[id]) return true; if (!isPremium()) return false;
+    const i = wyrIndex(id); if (i < 0) return !!POWER_INFO[id];
+    if (wyrEarned(i)) return false;                                            // you earned this pair — your own pick stands
+    return WYR_PAIRS[i][prem.wyr[i] || 0].id === id; }
 
   // ---------- storage / leaderboards ----------
   function today() { return new Date().toISOString().slice(0, 10); }
@@ -595,8 +627,8 @@
     unlocks.money = (unlocks.money || 0) + 10000;    // flat $10,000 on claiming an emerald key (never doubled)
     unlocks.emerald = (unlocks.emerald || 0) + 1;    // you can hold more than one emerald key
     unlocks.hasWon = true;                           // winning is permanent — perks survive selling the key
-    if (!unlocks.hammers.includes('emerald')) unlocks.hammers.push('emerald'); unlocks.equipped = 'emerald'; setHammer();
-    if (!unlocks.hats.includes('👑')) unlocks.hats.push('👑'); unlocks.hat = '👑'; setHat();
+    if (!unlocks.hammers.includes('emerald')) unlocks.hammers.push('emerald'); equip('emerald');
+    if (!unlocks.hats.includes('👑')) unlocks.hats.push('👑'); wearHat('👑');
     if (!unlocks.winnerName) { let nm = window.prompt('🏆💚 YOU WON THE GAME!\nEnter your name for the Certificate of Victory:', 'CHAMPION');
       unlocks.winnerName = (nm || 'CHAMPION').trim().slice(0, 16) || 'CHAMPION'; }
     saveUnlocks(); updateWinBanner(); updateMoneyHud(); updateKeyTotals();
@@ -798,14 +830,14 @@
   function popSomething() {
     if (holes.filter(h => h.up).length >= activeCap()) return;
     if (!keyActive) { const mag = powerOn('keyMagnet') ? 2 : 1;                                    // tiered keys, each gated by progression
-      if (unlocks.diamondUnlocked && Math.random() < CONFIG.diamondKeyChance * mag) { spawnKey('diamondKey'); return; }
-      if (unlocks.goldUnlocked && Math.random() < CONFIG.goldKeyChance * mag) { spawnKey('goldKey'); return; }
-      if (((unlocks.keysEarned || 0) >= CONFIG.rareKeyGate || unlocks.rareUnlocked) && Math.random() < CONFIG.rareKeyChance * mag) { spawnKey('rareKey'); return; }
+      if (tierOpen('diamondKey') && Math.random() < CONFIG.diamondKeyChance * mag) { spawnKey('diamondKey'); return; }
+      if (tierOpen('goldKey') && Math.random() < CONFIG.goldKeyChance * mag) { spawnKey('goldKey'); return; }
+      if (tierOpen('rareKey') && Math.random() < CONFIG.rareKeyChance * mag) { spawnKey('rareKey'); return; }
       if (Math.random() < CONFIG.keyChance * mag * (powerOn('keysLessRare') ? 1.5 : 1)) { spawnKey('key'); return; } }
     if (unlocks.hasWon && !mansionActive && Math.random() < CONFIG.mansionChance) { const d = downHoles(); if (d.length) { popMansion(d[Math.floor(Math.random() * d.length)]); return; } }
-    if (unlocks.houseUnlocked && !unlocks.hasWon && !houseActive && Math.random() < CONFIG.houseChance) { const d = downHoles(); if (d.length) { popHouse(d[Math.floor(Math.random() * d.length)]); return; } }   // mansion replaces houses
-    if (unlocks.shedsUnlocked && !unlocks.houseUnlocked && !shedActive && Math.random() < 0.06) { const d = downHoles(); if (d.length) { popShed(d[Math.floor(Math.random() * d.length)]); return; } }   // houses replace sheds
-    if (unlocks.store.pinata && !pinataActive && Math.random() < 0.05) { const d = downHoles(); if (d.length) { popPinata(d[Math.floor(Math.random() * d.length)]); return; } }
+    if (premOr(unlocks.houseUnlocked) && !unlocks.hasWon && !houseActive && Math.random() < CONFIG.houseChance) { const d = downHoles(); if (d.length) { popHouse(d[Math.floor(Math.random() * d.length)]); return; } }   // mansion replaces houses
+    if (premOr(unlocks.shedsUnlocked) && !premOr(unlocks.houseUnlocked) && !shedActive && Math.random() < 0.06) { const d = downHoles(); if (d.length) { popShed(d[Math.floor(Math.random() * d.length)]); return; } }   // houses replace sheds
+    if (premOr(unlocks.store.pinata) && !pinataActive && Math.random() < 0.05) { const d = downHoles(); if (d.length) { popPinata(d[Math.floor(Math.random() * d.length)]); return; } }
     const schance = classicOpts.alwaysSonic ? 0.3 : CONFIG.sonicChance;
     if (!sonicActive && Math.random() < schance) { spawnSonic(); return; }
     if (!dragonActive && Math.random() < CONFIG.dragonChance && downHoles().length >= 3) { popDragon(); return; }
@@ -903,8 +935,8 @@
     hole.el.innerHTML = '<div class="critter ' + (type === 'bomb' ? 'bomb">💣' : type === 'sonic' ? 'sonic">🦔' : 'hog">🦔') + '</div>';
     raiseUp(hole); hole.timeout = setTimeout(() => { hole.up = false; hole.el.classList.remove('up', 'sonichole'); }, ms * upMul()); }
   function vsKeyTiers() { const t = ['key'];                               // rare/gold/diamond only once they appear in classic
-    if ((unlocks.keysEarned || 0) >= CONFIG.rareKeyGate || unlocks.rareUnlocked) t.push('rareKey');
-    if (unlocks.goldUnlocked) t.push('goldKey'); if (unlocks.diamondUnlocked) t.push('diamondKey'); return t; }
+    if (tierOpen('rareKey')) t.push('rareKey');
+    if (tierOpen('goldKey')) t.push('goldKey'); if (tierOpen('diamondKey')) t.push('diamondKey'); return t; }
   function vsPlaceKey(hole, tier, triple) { hole.up = true; hole.type = tier; hole.keyTriple = !!triple;
     hole.el.classList.remove('bonked', 'sonichole'); hole.el.classList.add('keyhole'); hole.el.innerHTML = keyMarkup(tier, triple);
     raiseUp(hole); hole.timeout = setTimeout(() => { hole.up = false; hole.el.classList.remove('up', 'keyhole'); }, 1700 * upMul()); }
@@ -1123,37 +1155,37 @@
   // ---- store ----
   function storeItems() { return [
     { id: 'key', label: '🗝️ Key', cost: 200, has: () => false, buy: () => { unlocks.keys++; unlocks.keysEarned = (unlocks.keysEarned || 0) + 1; } },
-    { id: 'rareKey', label: '🔑 Rare Key (opens the rare chest)', cost: 1000, gate: () => gridsDone('normal'), has: () => false, buy: () => { unlocks.rareKeys++; markKeyGotten('rareKey'); } },
-    { id: 'unlockGold', label: '🔑 Unlock GOLD keys in the game', keyPay: 'rareKeys', keyCost: CONFIG.tierUnlockCost, payGlyph: '🔑', gate: () => gridsDone('rare'),
-      has: () => unlocks.goldUnlocked, buy: () => unlocks.goldUnlocked = true },
-    { id: 'unlockDiamond', label: '🔑 Unlock DIAMOND keys in the game', keyPay: 'goldKeys', keyCost: CONFIG.tierUnlockCost, gate: () => gridsDone('gold'), payGlyph: '🔑',
-      has: () => unlocks.diamondUnlocked, buy: () => unlocks.diamondUnlocked = true },
-    { id: 'tradeRare', label: '🔄 Trade 5 🗝️ keys → 1 🔑 rare key', keyPay: 'keys', keyCost: 5, payGlyph: '🗝️', gate: () => gridsDone('normal'), has: () => false, buy: () => { unlocks.rareKeys++; markKeyGotten('rareKey'); } },
-    { id: 'tradeGold', label: '🔄 Trade 5 🔑 rare → 1 🔑 gold key', keyPay: 'rareKeys', keyCost: 5, payGlyph: '🔑', gate: () => gridsDone('rare'), has: () => false, buy: () => { unlocks.goldKeys++; markKeyGotten('goldKey'); } },
-    { id: 'tradeDiamond', label: '🔄 Trade 5 🔑 gold → 1 🔑 diamond key', keyPay: 'goldKeys', keyCost: 5, payGlyph: '🔑', gate: () => gridsDone('gold'), has: () => false, buy: () => { unlocks.diamondKeys++; markKeyGotten('diamondKey'); } },
-    { id: 'emeraldKey', label: '💚 THE Emerald Key — WIN THE GAME! (mansion, emerald hammer, throne & more)', keyPay: 'diamondKeys', keyCost: CONFIG.emeraldTradeCost, payGlyph: '🔷', gate: () => gridsDone('diamond'), has: () => false, buy: grantEmerald },
+    { id: 'rareKey', label: '🔑 Rare Key (opens the rare chest)', cost: 1000, gate: () => tradeOpen('normal'), has: () => false, buy: () => { unlocks.rareKeys++; markKeyGotten('rareKey'); } },
+    { id: 'unlockGold', label: '🔑 Unlock GOLD keys in the game', keyPay: 'rareKeys', keyCost: CONFIG.tierUnlockCost, payGlyph: '🔑', gate: () => tradeOpen('rare'),
+      has: () => premOr(unlocks.goldUnlocked), buy: () => unlocks.goldUnlocked = true },
+    { id: 'unlockDiamond', label: '🔑 Unlock DIAMOND keys in the game', keyPay: 'goldKeys', keyCost: CONFIG.tierUnlockCost, gate: () => tradeOpen('gold'), payGlyph: '🔑',
+      has: () => premOr(unlocks.diamondUnlocked), buy: () => unlocks.diamondUnlocked = true },
+    { id: 'tradeRare', label: '🔄 Trade 5 🗝️ keys → 1 🔑 rare key', keyPay: 'keys', keyCost: 5, payGlyph: '🗝️', gate: () => tradeOpen('normal'), has: () => false, buy: () => { unlocks.rareKeys++; markKeyGotten('rareKey'); } },
+    { id: 'tradeGold', label: '🔄 Trade 5 🔑 rare → 1 🔑 gold key', keyPay: 'rareKeys', keyCost: 5, payGlyph: '🔑', gate: () => tradeOpen('rare'), has: () => false, buy: () => { unlocks.goldKeys++; markKeyGotten('goldKey'); } },
+    { id: 'tradeDiamond', label: '🔄 Trade 5 🔑 gold → 1 🔑 diamond key', keyPay: 'goldKeys', keyCost: 5, payGlyph: '🔑', gate: () => tradeOpen('gold'), has: () => false, buy: () => { unlocks.diamondKeys++; markKeyGotten('diamondKey'); } },
+    { id: 'emeraldKey', label: '💚 THE Emerald Key — WIN THE GAME! (mansion, emerald hammer, throne & more)', keyPay: 'diamondKeys', keyCost: CONFIG.emeraldTradeCost, payGlyph: '🔷', gate: () => tradeOpen('diamond'), has: () => false, buy: grantEmerald },
     { id: 'sell_key', sell: { bal: 'keys', glyph: '🗝️', amt: 10, name: 'key' }, has: () => false },
     { id: 'sell_rareKey', sell: { bal: 'rareKeys', glyph: '🟢🔑', amt: 100, name: 'rare key' }, has: () => false },
     { id: 'sell_goldKey', sell: { bal: 'goldKeys', glyph: '🟡🔑', amt: 1000, name: 'gold key' }, has: () => false },
     { id: 'sell_diamondKey', sell: { bal: 'diamondKeys', glyph: '🔷🔑', amt: 10000, name: 'diamond key' }, has: () => false },
     { id: 'sell_emerald', sell: { emerald: true, glyph: '💚', amt: 100000, name: 'THE emerald key' }, has: () => false },
-    { id: 'power', label: '⭐ Random Power', cost: 400, has: () => POWER_POOL.every(p => unlocks.powers[p.id]), buy: buyRandomPower },
-    { id: 'hammer', label: '🔨 Random Hammer', cost: 150, has: () => HAMMER_POOL.every(h => unlocks.hammers.includes(h)), buy: buyRandomHammer },
+    { id: 'power', label: '⭐ Random Power', cost: 400, has: () => POWER_POOL.every(p => hasPower(p.id)), buy: buyRandomPower },
+    { id: 'hammer', label: '🔨 Random Hammer', cost: 150, has: () => HAMMER_POOL.every(h => allHammers().includes(h)), buy: buyRandomHammer },
     ...STORE_HAMMERS.map(sh => ({ id: 'sh_' + sh.id, label: sh.label, cost: sh.cost,
-      has: () => unlocks.hammers.includes(sh.id),
-      buy: () => { if (!unlocks.hammers.includes(sh.id)) unlocks.hammers.push(sh.id); unlocks.equipped = sh.id; setHammer(); } })),
-    { id: 'hat', label: '🎩 Random Hat', cost: 250, has: () => HAT_POOL.every(h => unlocks.hats.includes(h)), buy: buyRandomHat },
-    { id: 'sheds', label: '🛖 Unlock Sheds', cost: 350, has: () => unlocks.shedsUnlocked, buy: () => unlocks.shedsUnlocked = true },
-    { id: 'pinata', label: '💰 Money Piñatas (appear in game)', cost: 600, has: () => unlocks.store.pinata, buy: () => unlocks.store.pinata = true },
-    { id: 'gmountain', label: '⛰️ Mountain grid', cost: 300, has: () => unlocks.grids.mountain, buy: () => unlocks.grids.mountain = true },
-    { id: 'g4', label: '🔳 4×4 grid', cost: 250, has: () => unlocks.grids.g4, buy: () => unlocks.grids.g4 = true },
-    { id: 'g6', label: '🔲 6×6 grid', cost: 250, has: () => unlocks.grids.g6, buy: () => unlocks.grids.g6 = true },
-    { id: 'gbomb', label: '💣 Bomb Round grid', cost: 300, has: () => unlocks.grids.bombRound, buy: () => unlocks.grids.bombRound = true },
-    { id: 'gsonic', label: '🦔 Sonic Round grid', cost: 300, has: () => unlocks.grids.sonicRound, buy: () => unlocks.grids.sonicRound = true }
+      has: () => allHammers().includes(sh.id),
+      buy: () => { if (!unlocks.hammers.includes(sh.id)) unlocks.hammers.push(sh.id); equip(sh.id); } })),
+    { id: 'hat', label: '🎩 Random Hat', cost: 250, has: () => HAT_POOL.every(h => allHats().includes(h)), buy: buyRandomHat },
+    { id: 'sheds', label: '🛖 Unlock Sheds', cost: 350, has: () => premOr(unlocks.shedsUnlocked), buy: () => unlocks.shedsUnlocked = true },
+    { id: 'pinata', label: '💰 Money Piñatas (appear in game)', cost: 600, has: () => premOr(unlocks.store.pinata), buy: () => unlocks.store.pinata = true },
+    { id: 'gmountain', label: '⛰️ Mountain grid', cost: 300, has: () => hasGrid('mountain'), buy: () => unlocks.grids.mountain = true },
+    { id: 'g4', label: '🔳 4×4 grid', cost: 250, has: () => hasGrid('g4'), buy: () => unlocks.grids.g4 = true },
+    { id: 'g6', label: '🔲 6×6 grid', cost: 250, has: () => hasGrid('g6'), buy: () => unlocks.grids.g6 = true },
+    { id: 'gbomb', label: '💣 Bomb Round grid', cost: 300, has: () => hasGrid('bombRound'), buy: () => unlocks.grids.bombRound = true },
+    { id: 'gsonic', label: '🦔 Sonic Round grid', cost: 300, has: () => hasGrid('sonicRound'), buy: () => unlocks.grids.sonicRound = true }
   ]; }
   function buyRandomPower() { const a = POWER_POOL.filter(p => !unlocks.powers[p.id]); if (a.length) { const p = a[Math.floor(Math.random() * a.length)]; unlocks.powers[p.id] = true; unlocks.powersOn[p.id] = true; } }
-  function buyRandomHammer() { const a = HAMMER_POOL.filter(h => !unlocks.hammers.includes(h)); if (a.length) { const h = a[Math.floor(Math.random() * a.length)]; unlocks.hammers.push(h); unlocks.equipped = h; setHammer(); } }
-  function buyRandomHat() { const a = HAT_POOL.filter(h => !unlocks.hats.includes(h)); if (a.length) { const h = a[Math.floor(Math.random() * a.length)]; unlocks.hats.push(h); unlocks.hat = h; setHat(); } }
+  function buyRandomHammer() { const a = HAMMER_POOL.filter(h => !unlocks.hammers.includes(h)); if (a.length) { const h = a[Math.floor(Math.random() * a.length)]; unlocks.hammers.push(h); equip(h); } }
+  function buyRandomHat() { const a = HAT_POOL.filter(h => !unlocks.hats.includes(h)); if (a.length) { const h = a[Math.floor(Math.random() * a.length)]; unlocks.hats.push(h); wearHat(h); } }
   function showStore() { renderStore(); overlay.classList.add('hidden'); storeEl.classList.remove('hidden'); }
   function renderStore() { storeMoney.textContent = '💵 $' + (unlocks.money || 0) + '  ·  🔑 rare ' + (unlocks.rareKeys || 0) + '  ·  🔑 gold ' + (unlocks.goldKeys || 0);
     storeListEl.innerHTML = storeItems().filter(it => !it.gate || it.gate()).map(it => {
@@ -1164,7 +1196,7 @@
       let price, afford;
       if (it.keyPay) { afford = (unlocks[it.keyPay] || 0) >= it.keyCost; price = (it.payGlyph || '🔑') + '×' + it.keyCost; }
       else { afford = (unlocks.money || 0) >= it.cost; price = '$' + it.cost; }
-      const btn = owned ? '<button disabled>Owned</button>' : '<button data-buy="' + it.id + '"' + (afford ? '' : ' disabled') + '>' + price + '</button>';
+      const btn = owned ? '<button disabled>' + (isPremium() ? '💎 Unlocked' : 'Owned') + '</button>' : '<button data-buy="' + it.id + '"' + (afford ? '' : ' disabled') + '>' + price + '</button>';
       return '<div class="strow"><span>' + it.label + '</span>' + btn + '</div>'; }).join(''); }
   function sellKey(sell) {
     if (sell.emerald) { if ((unlocks.emerald || 0) <= 0) return; unlocks.emerald--;
@@ -1185,24 +1217,25 @@
   function renderPowers() {
     const wyrIds = new Set(); WYR_PAIRS.forEach(p => p.forEach(o => wyrIds.add(o.id)));
     let html = '';
-    Object.keys(POWER_INFO).filter(k => unlocks.powers[k] && !wyrIds.has(k)).forEach(k => { const on = unlocks.powersOn[k] !== false;
+    Object.keys(POWER_INFO).filter(k => hasPower(k) && !wyrIds.has(k)).forEach(k => { const on = unlocks.powersOn[k] !== false;
       html += '<div class="powrow"><span>⭐ ' + POWER_INFO[k] + '</span><button data-p="' + k + '" class="' + (on ? 'on' : 'off') + '">' + (on ? 'ON' : 'OFF') + '</button></div>'; });
-    WYR_PAIRS.forEach((pair, i) => { if (!unlocks.powers[pair[0].id] && !unlocks.powers[pair[1].id]) return;   // once earned, switch freely
-      const act = unlocks.powers[pair[0].id] ? 0 : 1;
+    WYR_PAIRS.forEach((pair, i) => { if (!hasPower(pair[0].id) && !hasPower(pair[1].id)) return;   // once earned, switch freely
+      const act = hasPower(pair[0].id) ? 0 : 1;
       html += '<div class="powrow wyrrow"><span>🤔 Would-you-rather <small>(tap to switch)</small></span><span class="wyrbtns">'
         + '<button data-wyr="' + i + '" data-opt="0" class="' + (act === 0 ? 'on' : 'off') + '">' + pair[0].label + '</button>'
         + '<button data-wyr="' + i + '" data-opt="1" class="' + (act === 1 ? 'on' : 'off') + '">' + pair[1].label + '</button></span></div>'; });
     powersList.innerHTML = html || '<div style="opacity:.7">No powers yet — open chests to find them!</div>';
   }
   function switchWyr(i, opt) { const pair = WYR_PAIRS[i], chosen = pair[opt], other = pair[1 - opt];
+    if (isPremium() && !wyrEarned(i)) { prem.wyr[i] = opt; savePrem(); renderPowers(); return; }   // premium pick — kept out of your save
     unlocks.powers[chosen.id] = true; unlocks.powersOn[chosen.id] = true; unlocks.powers[other.id] = false; unlocks.powersOn[other.id] = false; saveUnlocks(); renderPowers(); }
   powersList.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation();
     if (b.dataset.wyr !== undefined) { switchWyr(+b.dataset.wyr, +b.dataset.opt); return; }
     const k = b.dataset.p; const cur = unlocks.powersOn[k] !== false; unlocks.powersOn[k] = !cur; saveUnlocks(); renderPowers(); });
   powersClose.addEventListener('click', e => { e.stopPropagation(); powersEl.classList.add('hidden'); overlay.classList.remove('hidden'); renderMenu(); });
   function applyReward(rw) {
-    if (rw.kind === 'hammer') { if (!unlocks.hammers.includes(rw.val)) unlocks.hammers.push(rw.val); unlocks.equipped = rw.val; setHammer(); }
-    else if (rw.kind === 'betterHammer') { if (!unlocks.hammers.includes(rw.val)) unlocks.hammers.push(rw.val); unlocks.equipped = rw.val; setHammer(); }
+    if (rw.kind === 'hammer') { if (!unlocks.hammers.includes(rw.val)) unlocks.hammers.push(rw.val); equip(rw.val); }
+    else if (rw.kind === 'betterHammer') { if (!unlocks.hammers.includes(rw.val)) unlocks.hammers.push(rw.val); equip(rw.val); }
     else if (rw.kind === 'power') { unlocks.powers[rw.val] = true; unlocks.powersOn[rw.val] = true; }
     else if (rw.kind === 'grid') unlocks.grids[rw.val] = true;
     else if (rw.kind === 'mode') { if (rw.val === 'newChests') unlocks.keys++; else unlocks.modes[rw.val] = true; }
@@ -1214,7 +1247,7 @@
     else if (rw.kind === 'diamondKey') { unlocks.diamondKeys = (unlocks.diamondKeys || 0) + (rw.amount || 1); markKeyGotten('diamondKey'); }
     else if (rw.kind === 'house') unlocks.houseUnlocked = true;
     else if (rw.kind === 'storePinata') unlocks.store.pinata = true;
-    else if (rw.kind === 'hat') { if (!unlocks.hats.includes(rw.val)) unlocks.hats.push(rw.val); unlocks.hat = rw.val; setHat(); }
+    else if (rw.kind === 'hat') { if (!unlocks.hats.includes(rw.val)) unlocks.hats.push(rw.val); wearHat(rw.val); }
     saveUnlocks();
     if (['hammer', 'betterHammer', 'power', 'grid', 'mode', 'shed', 'hat', 'house', 'storePinata'].includes(rw.kind)) resetOnAdd(rw.label); }
   chestClose.addEventListener('click', e => { e.stopPropagation(); chest.classList.add('hidden'); overlay.classList.remove('hidden'); renderMenu(); });
@@ -1222,7 +1255,8 @@
   // ================= MENU =================
   function renderMenu() {
     updateKeyTotals();
-    let h = ''; const g = unlocks.grids, m = unlocks.modes;
+    let h = ''; const g = {}, m = {};
+    GRID_REWARDS.forEach(x => g[x.val] = hasGrid(x.val)); ['twoPlayer', 'vsCpu', 'hard', 'bossesAlways'].forEach(x => m[x] = hasMode(x));
     if (g.g4) h += '<button data-act="grid-g4">🔳 4×4</button>';
     if (g.g6) h += '<button data-act="grid-g6">🔲 6×6</button>';
     if (g.mountain) h += '<button data-act="grid-mountain">⛰️ Mountain</button>';
@@ -1233,25 +1267,29 @@
     if (m.twoPlayer) h += '<button data-act="mode-2p">👥 2 Player</button>';
     if (m.vsCpu) h += '<button data-act="mode-vscpu">🤖 Vs CPU</button>';
     unlockRow.innerHTML = h;
-    let gr = '<span>Hammer:</span> <button id="hammerBtn">' + hammerGlyph(unlocks.equipped) + '</button>';
+    let gr = '<span>Hammer:</span> <button id="hammerBtn">' + hammerGlyph(curEquipped()) + '</button>';
     if (!gridsDone('normal')) gr += ' <button id="chestBtn">🧰 Chest — 🗝️ ' + unlocks.keys + '</button>';
-    if ((unlocks.rareKeys > 0 || unlocks.rareBoard) && !gridsDone('rare')) gr += ' <button id="rareBtn">🟢🔑 Rare — ' + unlocks.rareKeys + '</button>';
-    if ((unlocks.goldUnlocked || unlocks.goldKeys > 0 || unlocks.goldBoard) && !gridsDone('gold')) gr += ' <button id="goldBtn">🟡🔑 Gold — ' + (unlocks.goldKeys || 0) + '</button>';
-    if ((unlocks.diamondUnlocked || unlocks.diamondKeys > 0 || unlocks.diamondBoard) && !gridsDone('diamond')) gr += ' <button id="diamondBtn">🔷🔑 Diamond — ' + (unlocks.diamondKeys || 0) + '</button>';
+    if ((unlocks.rareKeys > 0 || unlocks.rareBoard || isPremium()) && !gridsDone('rare')) gr += ' <button id="rareBtn">🟢🔑 Rare — ' + unlocks.rareKeys + '</button>';
+    if ((tierOpen('goldKey') || unlocks.goldKeys > 0 || unlocks.goldBoard) && !gridsDone('gold')) gr += ' <button id="goldBtn">🟡🔑 Gold — ' + (unlocks.goldKeys || 0) + '</button>';
+    if ((tierOpen('diamondKey') || unlocks.diamondKeys > 0 || unlocks.diamondBoard) && !gridsDone('diamond')) gr += ' <button id="diamondBtn">🔷🔑 Diamond — ' + (unlocks.diamondKeys || 0) + '</button>';
     gr += ' <button id="powersBtn">⭐ Powers</button>';
     gr += ' <button id="storeBtn">🛒 Store ($' + (unlocks.money || 0) + ')</button>';
-    if (unlocks.hats.length) gr += ' <button id="hatBtn">🎩 ' + (unlocks.hat || 'none') + '</button>';
-    gearRow.innerHTML = gr;
-    $('hammerBtn').addEventListener('click', e => { e.stopPropagation(); const i = unlocks.hammers.indexOf(unlocks.equipped);
-      unlocks.equipped = unlocks.hammers[(i + 1) % unlocks.hammers.length]; setHammer(); saveUnlocks(); renderMenu(); });
+    if (allHats().length) gr += ' <button id="hatBtn">🎩 ' + (curHat() || 'none') + '</button>';
+    gearRow.innerHTML = gr; premiumNote.classList.toggle('hidden', !isPremium());
+    $('hammerBtn').addEventListener('click', e => { e.stopPropagation(); const list = allHammers(), i = list.indexOf(curEquipped());
+      const next = list[(i + 1) % list.length];
+      if (unlocks.hammers.includes(next)) { unlocks.equipped = next; prem.equipped = null; } else prem.equipped = next;   // premium-only hammers never go in your save
+      savePrem(); setHammer(); saveUnlocks(); renderMenu(); });
     if ($('chestBtn')) $('chestBtn').addEventListener('click', e => { e.stopPropagation(); showChest('normal'); });
     if ($('rareBtn')) $('rareBtn').addEventListener('click', e => { e.stopPropagation(); showChest('rare'); });
     if ($('goldBtn')) $('goldBtn').addEventListener('click', e => { e.stopPropagation(); showChest('gold'); });
     if ($('diamondBtn')) $('diamondBtn').addEventListener('click', e => { e.stopPropagation(); showChest('diamond'); });
     $('powersBtn').addEventListener('click', e => { e.stopPropagation(); showPowers(); });
     $('storeBtn').addEventListener('click', e => { e.stopPropagation(); showStore(); });
-    if ($('hatBtn')) $('hatBtn').addEventListener('click', e => { e.stopPropagation(); const opts = [null].concat(unlocks.hats);
-      const i = opts.indexOf(unlocks.hat); unlocks.hat = opts[(i + 1) % opts.length]; setHat(); saveUnlocks(); renderMenu(); });
+    if ($('hatBtn')) $('hatBtn').addEventListener('click', e => { e.stopPropagation(); const opts = [null].concat(allHats());
+      const i = opts.indexOf(curHat()), next = opts[(i + 1) % opts.length];
+      if (next === null || unlocks.hats.includes(next)) { unlocks.hat = next; prem.hat = null; } else prem.hat = next;
+      savePrem(); setHat(); saveUnlocks(); renderMenu(); });
   }
   unlockRow.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation();
     const act = b.dataset.act;
@@ -1322,6 +1360,13 @@
 
   // init
   setHammer(); setHat(); updateMoneyHud(); setHudLabels(); buildGrid(CONFIG.cols); renderMenu(); renderBoardView('classic'); updateWinBanner(); updateKeyTotals();
+  // 💎 re-check Premium when it's bought / turned off (shared ad script), changed in another tab, or simply expires
+  let premWas = isPremium();
+  function onPremiumChange() { premWas = isPremium(); setHammer(); setHat(); renderMenu();
+    if (!storeEl.classList.contains('hidden')) renderStore(); if (!powersEl.classList.contains('hidden')) renderPowers(); }
+  window.addEventListener('arcade-premium-change', onPremiumChange);
+  window.addEventListener('storage', e => { if (!e.key || e.key === 'squarebox:premiumUntil') onPremiumChange(); });
+  setInterval(() => { if (isPremium() !== premWas) onPremiumChange(); }, 5000);
   if (part2Refunded) setTimeout(() => flash('💵 Part 2 was removed — refunded $1,000,000!', 'gold'), 400);
 })();
 </script>
