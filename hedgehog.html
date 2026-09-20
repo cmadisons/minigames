@@ -26,7 +26,9 @@
   .float.bad { color: #ff6a6a; } .float.frost { color: #9ad4ff; }
   @keyframes floatUp { from { transform: translate(-50%,0); opacity: 1; } to { transform: translate(-50%,-70px); opacity: 0; } }
 
-  #grid { display: grid; gap: 14px; padding: 20px; background: rgba(60,40,20,.25); border-radius: 20px; }
+  #grid { display: grid; gap: 14px; padding: 20px; background: rgba(60,40,20,.25); border-radius: 20px;
+    /* No panning or pinch-zooming the board out from under a swing. */
+    touch-action: none; }
   .hole { width: 92px; height: 100px; position: relative; cursor: none; overflow: hidden; }
   .hole::after { content: ""; position: absolute; left: 50%; bottom: 2px; width: 84px; height: 28px;
     background: radial-gradient(ellipse at center, #3a2412 0%, #5a3a1c 70%, #6b4423 100%);
@@ -131,7 +133,7 @@
   #chestGrid.diamond .ctile { width: 74px; height: 74px; font-size: 32px; box-shadow: 0 4px 0 #2b7fa6 !important; background: linear-gradient(#c4f0ff,#5cc7e6) !important; color: #053a4a !important; }
   #chest.rare { background: rgba(4,26,10,.9); }
 
-  #overlay, #bombChoice, #sonicChoice, #chest, #powers { position: fixed; inset: 0; background: rgba(0,0,0,.62);
+  #overlay, #bombChoice, #sonicChoice, #chest, #powers, #achv { position: fixed; inset: 0; background: rgba(0,0,0,.62);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
     color: #fff; text-align: center; z-index: 200; cursor: none; padding: 14px; overflow-y: auto; }
   #bombChoice { z-index: 300; background: rgba(20,0,0,.65); }
@@ -139,6 +141,22 @@
   #chest { z-index: 320; background: rgba(12,6,30,.82); }
   #powers { z-index: 320; background: rgba(20,14,4,.85); }
   #powers h2 { font-size: 32px; color: #ffd24a; }
+  #achv { z-index: 320; background: rgba(6,14,26,.9); }
+  #achv h2 { font-size: 32px; color: #7fdcff; }
+  #achvList { display: flex; flex-direction: column; gap: 8px; min-width: 320px; max-width: 520px; width: 100%; }
+  .achrow { display: flex; align-items: center; gap: 12px; text-align: left;
+    background: rgba(0,0,0,.35); padding: 9px 14px; border-radius: 14px; font-size: 15px; }
+  .achrow.done { background: rgba(60,180,120,.26); box-shadow: inset 0 0 0 1px rgba(130,255,190,.35); }
+  .achrow .ai { font-size: 26px; flex: none; filter: grayscale(1) opacity(.45); }
+  .achrow.done .ai { filter: none; }
+  .achrow .an { font-weight: bold; }
+  .achrow .ad { font-size: 12.5px; color: #cfd8e6; }
+  .achrow .ap { margin-left: auto; font-size: 13px; color: #9fb2cd; white-space: nowrap; }
+  .achrow.done .ap { color: #8effc4; font-weight: bold; }
+  #achvCount { color: #7fdcff; font-weight: bold; }
+  #saveRow { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  #saveRow button { cursor: none; font: bold 14px "Trebuchet MS", sans-serif; padding: 8px 16px;
+    border: none; border-radius: 20px; background: #24364f; color: #cfe6ff; }
   #powersList { display: flex; flex-direction: column; gap: 10px; min-width: 320px; }
   .powrow { display: flex; align-items: center; justify-content: space-between; gap: 16px;
     background: rgba(0,0,0,.35); padding: 10px 16px; border-radius: 14px; font-size: 17px; }
@@ -190,6 +208,34 @@
   #board .empty { opacity: .6; font-size: 14px; padding: 5px 0; }
   #board small { opacity: .45; font-size: 11px; }
   .hidden { display: none !important; }
+
+  /* ------------------------------------------------------------- phones
+     The board is 92px holes with 14px gaps and 20px of padding, which is a
+     6-wide grid about 700px across -- half again as wide as a phone. It
+     shrinks here rather than overflowing, and the hammer gets smaller with
+     it so it does not cover the hole it is about to hit.
+
+     The fixed corner HUD pieces move in off the edges too: on a narrow
+     screen they were sitting on top of the grid. */
+  @media (max-width: 620px) {
+    body { padding: 8px; }
+    #grid { gap: 8px; padding: 10px; border-radius: 14px; }
+    .hole { width: 52px; height: 58px; }
+    .hole::after { width: 48px; height: 17px; }
+    .critter { font-size: 34px !important; }
+    #hammer { font-size: 38px; }
+    #hammer2 { font-size: 34px; }
+    #hud { gap: 5px; flex-wrap: wrap; justify-content: center; }
+    #hud .pill { font-size: 12px; padding: 4px 9px; }
+    #moneyHud, #keyTotals, #wonBadge { font-size: 12px; }
+    #achvList { min-width: 0; }
+    .achrow { font-size: 13.5px; padding: 8px 10px; gap: 9px; }
+    .achrow .ai { font-size: 21px; }
+    .achrow .ad { font-size: 11.5px; }
+    #powersList { min-width: 0; }
+    /* A phone has no pointer to hide, so give the taps a visible target. */
+    .hole, #boardTabs button, .powrow button, #saveRow button { cursor: pointer; }
+  }
 </style>
 </head>
 <body>
@@ -239,6 +285,17 @@
     <button id="chestClose" class="hidden">Continue</button>
   </div>
 
+  <div id="achv" class="hidden">
+    <h2 id="achvTitle">🏅 Achievements</h2>
+    <p>Everything here is worked out from your save — nothing extra to collect.</p>
+    <div id="achvList"></div>
+    <div id="saveRow">
+      <button id="exportBtn">⬇️ Export save</button>
+      <button id="importBtn">⬆️ Import save</button>
+    </div>
+    <button id="achvClose">Continue</button>
+  </div>
+
   <div id="powers" class="hidden">
     <h2>⭐ Your Powers</h2>
     <p>Tap a power to turn it on or off.</p>
@@ -277,6 +334,7 @@
       <button id="startBtn">▶ Classic</button>
       <button id="mostBtn">📅 Most Sonics</button>
       <button id="speedBtn">⚡ Speedrun 10</button>
+      <button id="achvBtn">🏅 Achievements</button>
     </div>
     <div class="menu" id="unlockRow"></div>
     <div id="gearRow"></div>
@@ -359,12 +417,18 @@
     { kind:'mode', val:'bossesAlways', icon:'👁️', label:'MODE: Bosses Always' },
     { kind:'mode', val:'newChests',    icon:'🎁', label:'BONUS: a free extra key!' }
   ];
-  const SPECIAL_HAMMER = { saber:'🗡️', aoe:'🪓', time:'⏱️', gold:'💰', star:'🌟', rocket:'🚀', diamond:'💎', emerald:'💚' };
+  const SPECIAL_HAMMER = { saber:'🗡️', aoe:'🪓', time:'⏱️', gold:'💰', star:'🌟', rocket:'🚀', diamond:'💎',
+                           storm:'🌩️', magnet:'🧲', phoenix:'🔥', emerald:'💚' };
   // store-ONLY hammers — never appear in the normal chest or the rare chest
   const STORE_HAMMERS = [
     { id:'star',    glyph:'🌟', cost:700,  label:'🌟 Star Hammer — +2 points per hedgehog' },
     { id:'rocket',  glyph:'🚀', cost:900,  label:'🚀 Rocket Hammer — splash hits all 4 side holes' },
-    { id:'diamond', glyph:'💎', cost:1200, label:'💎 Diamond Hammer — earn $10 per hedgehog' }
+    { id:'diamond', glyph:'💎', cost:1200, label:'💎 Diamond Hammer — earn $10 per hedgehog' },
+    // Three tiers above Diamond, for the long stretch between the diamond
+    // chest and the Emerald Key where money had nothing left to buy.
+    { id:'storm',   glyph:'🌩️', cost:2000, label:'🌩️ Storm Hammer — splash hits all 4 sides AND +1s each' },
+    { id:'magnet',  glyph:'🧲', cost:3000, label:'🧲 Magnet Hammer — every whack is worth $20 and +1 point' },
+    { id:'phoenix', glyph:'🔥', cost:5000, label:'🔥 Phoenix Hammer — +2s, +2 points and $25 a hedgehog' }
   ];
   const BETTER_HAMMERS = [
     { id:'aoe',  label:'Splash Hammer — also hits the 2 side holes' },
@@ -413,7 +477,7 @@
   // ---------- unlocks (persist across versions) ----------
   function defaultUnlocks() { return { hammers:['🔨'], equipped:'🔨', keys:0, board:null, keysEarned:0, rareUnlocked:false,
     goldKeys:0, goldBoard:null, goldUnlocked:false, diamondKeys:0, diamondBoard:null, diamondUnlocked:false, houseUnlocked:false,
-    emerald:0, hasWon:false, part2:false, part2won:false, winnerName:null, lastBonusDay:null, streak:0, lastPlayDay:null, boardsDone:{normal:0,rare:0,gold:0,diamond:0},
+    sound:true, emerald:0, hasWon:false, part2:false, part2won:false, winnerName:null, lastBonusDay:null, streak:0, lastPlayDay:null, boardsDone:{normal:0,rare:0,gold:0,diamond:0},
     money:0, rareKeys:0, rareBoard:null, shedsUnlocked:false, hats:[], hat:null,
     store:{ pinata:false, helper:false },
     powers:{bombHalf:false,missNothing:false,bossFewerBombs:false},
@@ -447,7 +511,7 @@
         keysEarned: u.keysEarned || 0, rareUnlocked: !!u.rareUnlocked,
         goldKeys: u.goldKeys || 0, goldBoard: u.goldBoard || null, goldUnlocked: !!u.goldUnlocked,
         diamondKeys: u.diamondKeys || 0, diamondBoard: u.diamondBoard || null, diamondUnlocked: !!u.diamondUnlocked, houseUnlocked: !!u.houseUnlocked,
-        emerald: Number(u.emerald) || 0, hasWon: !!u.hasWon || (Number(u.emerald) || 0) > 0, part2: !!u.part2, part2won: !!u.part2won, winnerName: u.winnerName || null, lastBonusDay: u.lastBonusDay || null, streak: u.streak || 0, lastPlayDay: u.lastPlayDay || null,
+        sound: u.sound !== false, emerald: Number(u.emerald) || 0, hasWon: !!u.hasWon || (Number(u.emerald) || 0) > 0, part2: !!u.part2, part2won: !!u.part2won, winnerName: u.winnerName || null, lastBonusDay: u.lastBonusDay || null, streak: u.streak || 0, lastPlayDay: u.lastPlayDay || null,
         boardsDone: Object.assign({ normal: 0, rare: 0, gold: 0, diamond: 0 }, u.boardsDone || {}),
         money: u.money || 0, rareKeys: u.rareKeys || 0, rareBoard: u.rareBoard || null, shedsUnlocked: !!u.shedsUnlocked,
         hats: u.hats || [], hat: u.hat || null, store: Object.assign(d.store, u.store || {}),
@@ -457,10 +521,52 @@
   }
   function saveUnlocks() { try { localStorage.setItem(UNLOCK_KEY, JSON.stringify(unlocks)); } catch (e) {} }
   function isSaber() { return curEquipped() === 'saber'; }
+  /* ------------------------------------------------------------- sound
+     Short tones off the Web Audio clock rather than sound files, so the
+     game stays one HTML file with nothing to download. The context cannot
+     be created until the player has actually touched the page, so it is
+     built on the first whack and reused after that.
+
+     Off by default it is not -- but the switch is in the Powers panel and
+     it sticks, because a game that pings at you in a quiet room and gives
+     you no way to stop it is worse than a silent one.                    */
+  let AC = null;
+  const SOUNDS = {
+    hit:   { f: 660, to: 990, d: 0.09, type: 'square',   g: 0.16 },
+    miss:  { f: 200, to: 120, d: 0.12, type: 'sawtooth', g: 0.10 },
+    key:   { f: 880, to: 1320, d: 0.22, type: 'triangle', g: 0.16 },
+    money: { f: 520, to: 780, d: 0.14, type: 'triangle', g: 0.13 },
+    bomb:  { f: 160, to: 60,  d: 0.30, type: 'sawtooth', g: 0.20 },
+    win:   { f: 523, to: 1046, d: 0.45, type: 'sine',    g: 0.20 }
+  };
+  function soundOn() { return unlocks.sound !== false; }
+  function beep(name) {
+    if (!soundOn()) return;
+    const spec = SOUNDS[name]; if (!spec) return;
+    try {
+      if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+      if (AC.state === 'suspended') AC.resume();
+      const t = AC.currentTime;
+      const osc = AC.createOscillator(), gain = AC.createGain();
+      osc.type = spec.type;
+      osc.frequency.setValueAtTime(spec.f, t);
+      osc.frequency.exponentialRampToValueAtTime(spec.to, t + spec.d);
+      gain.gain.setValueAtTime(spec.g, t);
+      // Ramp down rather than stopping dead, which clicks.
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + spec.d);
+      osc.connect(gain); gain.connect(AC.destination);
+      osc.start(t); osc.stop(t + spec.d + 0.02);
+    } catch (e) { }
+  }
+
   function isBetter(id) { return curEquipped() === id; }
   function hammerGlyph(v) { return SPECIAL_HAMMER[v] || v; }
   function setHammer() { const eq = curEquipped(); hammer.textContent = hammerGlyph(eq); hammer.classList.toggle('saberhammer', !!SPECIAL_HAMMER[eq]); }
-  function addMoney(n) { if (unlocks.emerald) n *= 2; unlocks.money = (unlocks.money || 0) + n; saveUnlocks(); updateMoneyHud(); }
+  function addMoney(n) { if (unlocks.emerald) n *= 2; unlocks.money = (unlocks.money || 0) + n;
+    // Only the lump sums chime. Hammers that pay per hedgehog would otherwise
+    // turn a good round into a cash register.
+    if (n >= 100) beep('money');
+    saveUnlocks(); updateMoneyHud(); }
   function updateMoneyHud() { moneyHud.textContent = '💵 $' + (unlocks.money || 0); }
   function setHat() { const ht = curHat(); if (ht) { hatEl.textContent = ht; hatEl.classList.remove('hidden'); } else hatEl.classList.add('hidden'); }
   function powerOn(name) { return !!(hasPower(name) && unlocks.powersOn[name] !== false); }
@@ -596,12 +702,18 @@
   function speedLevel() { return Math.min(CONFIG.speedMax, 1 + Math.floor(points / CONFIG.pointsPerLevel)); }
   function speedT() { return (speedLevel() - 1) / (CONFIG.speedMax - 1); }
 
-  function hitHog(hole, x, y) { const bonus = CONFIG.hitBonusSec + (isBetter('time') ? 1 : 0); timeLeft += bonus;
+  function hitHog(hole, x, y) {
+    const bonus = CONFIG.hitBonusSec
+      + (isBetter('time') ? 1 : 0) + (isBetter('storm') ? 1 : 0) + (isBetter('phoenix') ? 2 : 0);
+    timeLeft += bonus;
     floatText('+' + bonus + 's', x, y, 'good');
     if (isBetter('gold')) addMoney(5);
     if (isBetter('diamond')) addMoney(10);
     if (isBetter('star')) { points += 2; floatText('+2 pts', x, y - 22, 'gold'); }
+    if (isBetter('magnet')) { addMoney(20); points += 1; floatText('🧲 +1 pt +$20', x, y - 22, 'gold'); }
+    if (isBetter('phoenix')) { addMoney(25); points += 2; floatText('🔥 +2 pts +$25', x, y - 22, 'gold'); }
     if (isBetter('emerald')) { addMoney(50); points += 3; floatText('💚 +3 pts +$50', x, y - 22, 'gold'); }
+    beep('hit');
     bonkDown(hole); }
   function aoeHit(hole) { const c = hole.idx % gridCols; const sides = [];
     if (c > 0) sides.push(holes[hole.idx - 1]); if (c < gridCols - 1) sides.push(holes[hole.idx + 1]);
@@ -624,6 +736,7 @@
   function hitMansion(hole, x, y) { addMoney(CONFIG.mansionWhack); floatText('🏰 +$' + CONFIG.mansionWhack, x, y, 'gold'); }
   // ===== THE EMERALD KEY — the ultimate win =====
   function grantEmerald() {
+    beep('win');
     unlocks.money = (unlocks.money || 0) + 10000;    // flat $10,000 on claiming an emerald key (never doubled)
     unlocks.emerald = (unlocks.emerald || 0) + 1;    // you can hold more than one emerald key
     unlocks.hasWon = true;                           // winning is permanent — perks survive selling the key
@@ -639,17 +752,101 @@
     const d = today(); if (unlocks.lastPlayDay === d) return;
     unlocks.streak = (unlocks.lastPlayDay === yesterday()) ? (unlocks.streak || 0) + 1 : 1;   // consecutive day? continue, else restart
     unlocks.lastPlayDay = d;
-    const money = Math.min(unlocks.streak, 20) * 500;                          // grows $500/day, caps at $10k/day
+    // The ladder used to stop dead at twenty days: same $10,000, same rare key
+    // every seventh day, for ever. It keeps climbing now -- $500 a day to a
+    // $25,000 ceiling at day fifty -- and the further you get the better the
+    // key, so a long streak is worth keeping alive.
+    const money = Math.min(unlocks.streak, 50) * 500;
     addMoney(money);
     let msg = '🔥 ' + unlocks.streak + '-day streak! +$' + money;
-    if (unlocks.streak % 7 === 0) { unlocks.rareKeys++; markKeyGotten('rareKey'); msg += ' + 🔑 rare key'; }        // weekly milestone
-    else if (unlocks.streak % 3 === 0) { unlocks.keys++; unlocks.keysEarned = (unlocks.keysEarned || 0) + 1; markKeyGotten('key'); msg += ' + 🗝️ key'; }
+    const st = unlocks.streak;
+    if (st % 30 === 0) { unlocks.diamondKeys = (unlocks.diamondKeys || 0) + 1; markKeyGotten('diamondKey'); msg += ' + 🔷 DIAMOND key!'; }
+    else if (st % 14 === 0) { unlocks.goldKeys = (unlocks.goldKeys || 0) + 1; markKeyGotten('goldKey'); msg += ' + 🔑 gold key'; }
+    else if (st % 7 === 0) { unlocks.rareKeys++; markKeyGotten('rareKey'); msg += ' + 🔑 rare key'; }
+    else if (st % 3 === 0) { unlocks.keys++; unlocks.keysEarned = (unlocks.keysEarned || 0) + 1; markKeyGotten('key'); msg += ' + 🗝️ key'; }
+    // Round-number days pay a lump sum on top, so the milestones feel like one.
+    const LUMPS = { 10: 5000, 25: 20000, 50: 75000, 100: 250000 };
+    if (LUMPS[st]) { addMoney(LUMPS[st]); msg += ' + 🎉 ' + st + '-DAY BONUS $' + LUMPS[st] + '!'; }
     if (unlocks.emerald) { addMoney(CONFIG.dailyPlayBonus);                    // emerald owners also keep their daily $1000 + a new hammer
       const avail = HAMMER_POOL.filter(h => !unlocks.hammers.includes(h));
       if (avail.length) { const h = avail[Math.floor(Math.random() * avail.length)]; unlocks.hammers.push(h); msg += ' + 🎁 ' + h; }
       msg += ' + 💚 $' + CONFIG.dailyPlayBonus; }
     saveUnlocks(); flash(msg, 'gold');
   }
+  /* ==================== achievements ====================================
+     Nothing new is recorded for these. Every one of them is a question the
+     save can already answer, so the page is honest the first time you open
+     it -- your history counts, rather than starting from zero the day the
+     feature arrived.                                                      */
+  function bestClassic() { const l = loadList(CLASSIC_KEY); return l.length ? l[0].score : 0; }
+  const ACHIEVEMENTS = [
+    { i:'\uD83D\uDD28', n:'First Whack',    d:'Play a round of Classic.',            at:()=>bestClassic()>0,                 p:()=>bestClassic()>0?'done':'not yet' },
+    { i:'\u2B50', n:'Half a Hundred',        d:'Score 50 points in one round.',       at:()=>bestClassic()>=50,               p:()=>Math.min(bestClassic(),50)+'/50' },
+    { i:'\uD83C\uDF1F', n:'Double Century', d:'Score 200 points in one round.',      at:()=>bestClassic()>=200,              p:()=>Math.min(bestClassic(),200)+'/200' },
+    { i:'\uD83D\uDDDD\uFE0F', n:'Keyholder', d:'Earn 25 normal keys.',              at:()=>(unlocks.keysEarned||0)>=25,     p:()=>Math.min(unlocks.keysEarned||0,25)+'/25' },
+    { i:'\uD83D\uDFE2', n:'Rare Air',       d:'Unlock the rare key tier.',           at:()=>!!unlocks.rareUnlocked,          p:()=>unlocks.rareUnlocked?'done':'locked' },
+    { i:'\uD83D\uDFE1', n:'Going for Gold', d:'Unlock the gold key tier.',           at:()=>!!unlocks.goldUnlocked,          p:()=>unlocks.goldUnlocked?'done':'locked' },
+    { i:'\uD83D\uDD37', n:'Diamond Hands',  d:'Unlock the diamond key tier.',        at:()=>!!unlocks.diamondUnlocked,       p:()=>unlocks.diamondUnlocked?'done':'locked' },
+    { i:'\uD83D\uDC9A', n:'Champion',       d:'Claim THE Emerald Key and win.',      at:()=>!!unlocks.hasWon,                p:()=>unlocks.hasWon?'WON':'locked' },
+    { i:'\uD83D\uDCB5', n:'Pocket Money',   d:'Have $10,000 at once.',               at:()=>(unlocks.money||0)>=10000,       p:()=>'$'+Math.min(unlocks.money||0,10000) },
+    { i:'\uD83D\uDCB0', n:'Rolling In It',  d:'Have $250,000 at once.',              at:()=>(unlocks.money||0)>=250000,      p:()=>'$'+Math.min(unlocks.money||0,250000) },
+    { i:'\uD83D\uDD25', n:'Week Straight',  d:'Play 7 days in a row.',               at:()=>(unlocks.streak||0)>=7,          p:()=>Math.min(unlocks.streak||0,7)+'/7' },
+    { i:'\uD83D\uDCC5', n:'Month Straight', d:'Play 30 days in a row.',              at:()=>(unlocks.streak||0)>=30,         p:()=>Math.min(unlocks.streak||0,30)+'/30' },
+    { i:'\uD83E\uDDF0', n:'Tooled Up',      d:'Own 10 different hammers.',           at:()=>(unlocks.hammers||[]).length>=10,p:()=>Math.min((unlocks.hammers||[]).length,10)+'/10' },
+    { i:'\uD83D\uDD25', n:'Phoenix Rising', d:'Buy the Phoenix Hammer.',             at:()=>(unlocks.hammers||[]).indexOf('phoenix')>=0 || !!(unlocks.store||{}).phoenix, p:()=>((unlocks.hammers||[]).indexOf('phoenix')>=0||!!(unlocks.store||{}).phoenix)?'done':'locked' },
+    { i:'\uD83C\uDFA9', n:'Hat Trick',      d:'Own 3 hats.',                         at:()=>(unlocks.hats||[]).length>=3,    p:()=>Math.min((unlocks.hats||[]).length,3)+'/3' },
+    { i:'\uD83C\uDFC1', n:'Clean Sweep',    d:'Finish all four chest grids.',        at:()=>{const b=unlocks.boardsDone||{};return b.normal>0&&b.rare>0&&b.gold>0&&b.diamond>0;},
+      p:()=>{const b=unlocks.boardsDone||{};return ['normal','rare','gold','diamond'].filter(k=>b[k]>0).length+'/4';} }
+  ];
+  function renderAchievements() {
+    const done = ACHIEVEMENTS.filter(a => { try { return a.at(); } catch (e) { return false; } });
+    $('achvList').innerHTML = ACHIEVEMENTS.map(a => {
+      let got = false; try { got = a.at(); } catch (e) { }
+      let prog = ''; try { prog = a.p(); } catch (e) { }
+      return '<div class="achrow' + (got ? ' done' : '') + '">' +
+        '<span class="ai">' + a.i + '</span>' +
+        '<span><span class="an">' + a.n + '</span><br><span class="ad">' + escapeHtml(a.d) + '</span></span>' +
+        '<span class="ap">' + escapeHtml(prog) + '</span></div>';
+    }).join('');
+    $('achvTitle').innerHTML = '\uD83C\uDFC5 Achievements \u2014 <span id="achvCount">' +
+      done.length + ' / ' + ACHIEVEMENTS.length + '</span>';
+  }
+
+  /* ---- taking your save with you ---------------------------------------
+     Everything lives in this browser's localStorage, so a new phone or a
+     cleared cache used to mean starting again. Export writes the save out
+     as a file; import reads one back.                                    */
+  function exportSave() {
+    const blob = new Blob([JSON.stringify({ v: 1, saved: new Date().toISOString(),
+      unlocks: unlocks, classic: loadList(CLASSIC_KEY) }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'whack-a-hedgehog-save-' + today() + '.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    flash('\u2B07\uFE0F Save exported', 'gold');
+  }
+  function importSave() {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'application/json,.json';
+    inp.addEventListener('change', () => {
+      const f = inp.files && inp.files[0]; if (!f) return;
+      const fr = new FileReader();
+      fr.onload = () => {
+        let data; try { data = JSON.parse(fr.result); } catch (e) { data = null; }
+        if (!data || !data.unlocks) { alert('That is not a Whack-a-Hedgehog save file.'); return; }
+        if (!confirm('Replace everything on this device with that save?\nYour current progress will be gone.')) return;
+        try {
+          localStorage.setItem(UNLOCK_KEY, JSON.stringify(data.unlocks));
+          if (Array.isArray(data.classic)) storeList(CLASSIC_KEY, data.classic);
+        } catch (e) { alert('Could not save it here.'); return; }
+        location.reload();
+      };
+      fr.readAsText(f);
+    });
+    inp.click();
+  }
+
   function updateWinBanner() {
     if (unlocks.hasWon) {
       wonBadge.classList.remove('hidden'); winBanner.classList.remove('hidden');
@@ -690,6 +887,7 @@
   function classicMiss(x, y) {
     if (powerOn('missNothing')) return;              // power: missing does nothing
     missStreak++;
+    beep('miss');
     if (missStreak >= CONFIG.missLimit) { missStreak = 0; timeLeft = Math.max(0, timeLeft - CONFIG.missPenaltySec);
       floatText('−' + CONFIG.missPenaltySec + 's', x, y, 'bad'); if (timeLeft <= 0) endGame(); }
     else floatText('miss', x, y, 'bad'); updateHud();
@@ -711,7 +909,7 @@
     popKey(d[Math.floor(Math.random() * d.length)], tier, keyIsTriple(tier)); }
   function collectKey(hole, x, y) { const tier = hole.type, triple = !!hole.keyTriple, info = KEY_TIERS[tier], n = triple ? 3 : 1;
     keyActive = false; clearTimeout(hole.timeout); hole.el.classList.remove('keyhole'); bonkDown(hole); hole.type = null; hole.keyTriple = false;
-    unlocks[info.bal] = (unlocks[info.bal] || 0) + n; markKeyGotten(tier); addRoundKey(tier, n);
+    unlocks[info.bal] = (unlocks[info.bal] || 0) + n; markKeyGotten(tier); addRoundKey(tier, n); beep('key');
     if (tier === 'key') { unlocks.keysEarned = (unlocks.keysEarned || 0) + n;                       // lifetime normal keys → gates rare keys
       if (powerOn('keyBonus5') && unlocks.keys >= 5) { unlocks.keys++; unlocks.keysEarned++; floatText('🗝️ bonus!', x, y - 24, 'gold'); } }
     saveUnlocks();                                                                                  // keys give NO points in classic
@@ -818,7 +1016,7 @@
 
   // spawners
   function popHog(hole) { hole.up = true; hole.type = 'hog'; hole.group = null; hole.headDone = false; hole.el.classList.remove('bonked', 'dragonhole'); hole.el.innerHTML = '<div class="critter hog">🦔</div>'; raiseUp(hole); hole.timeout = setTimeout(() => { hole.up = false; hole.el.classList.remove('up'); }, CONFIG.hogMs * upMul()); }
-  function popBomb(hole) { hole.up = true; hole.type = 'bomb'; hole.group = null; hole.headDone = false; hole.el.classList.remove('bonked', 'dragonhole'); hole.el.innerHTML = '<div class="critter bomb">💣</div>'; raiseUp(hole); hole.timeout = setTimeout(() => { hole.up = false; hole.el.classList.remove('up'); }, CONFIG.bombMs * upMul()); }
+  function popBomb(hole) { beep('bomb'); hole.up = true; hole.type = 'bomb'; hole.group = null; hole.headDone = false; hole.el.classList.remove('bonked', 'dragonhole'); hole.el.innerHTML = '<div class="critter bomb">💣</div>'; raiseUp(hole); hole.timeout = setTimeout(() => { hole.up = false; hole.el.classList.remove('up'); }, CONFIG.bombMs * upMul()); }
   function popDragon() { const down = downHoles(); if (down.length < 3) return; const pool = down.slice(), chosen = [];
     for (let i = 0; i < 3; i++) chosen.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
     const group = { headsLeft: 3, holes: chosen, timeout: null }; dragonActive = true;
@@ -974,10 +1172,10 @@
     if (isBetter('diamond')) addMoney(10);
     if (isBetter('star')) { vs.p1 += 2; floatText('+2', x, y - 22, 'good'); }
     if (isBetter('emerald')) { addMoney(50); vs.p1 += 3; floatText('💚 +3', x, y - 22, 'good'); }
-    if (isBetter('aoe') || isBetter('rocket')) {
+    if (isBetter('aoe') || isBetter('rocket') || isBetter('storm')) {
       const i = hole.idx, c = i % gridCols, r = Math.floor(i / gridCols), sides = [];
       if (c > 0) sides.push(holes[i - 1]); if (c < gridCols - 1) sides.push(holes[i + 1]);
-      if (isBetter('rocket')) { if (r > 0) sides.push(holes[i - gridCols]); if (r < gridCols - 1) sides.push(holes[i + gridCols]); }
+      if (isBetter('rocket') || isBetter('storm')) { if (r > 0) sides.push(holes[i - gridCols]); if (r < gridCols - 1) sides.push(holes[i + gridCols]); }
       sides.forEach(n => { if (n && n.up && n.type === 'hog') { vs.p1 += 1; n.el.classList.remove('sonichole'); bonkDown(n); n.type = null;
         const rr = n.el.getBoundingClientRect(); floatText('+1', rr.left + rr.width / 2, rr.top + rr.height / 2, 'good'); } });
     }
@@ -1216,7 +1414,12 @@
   function showPowers() { renderPowers(); overlay.classList.add('hidden'); powersEl.classList.remove('hidden'); }
   function renderPowers() {
     const wyrIds = new Set(); WYR_PAIRS.forEach(p => p.forEach(o => wyrIds.add(o.id)));
-    let html = '';
+    // The sound switch lives at the top of this panel. A game that pings at
+    // you in a quiet room and gives you no way to stop it is worse than a
+    // silent one, and this is the panel people already open to turn things
+    // off.
+    let html = '<div class="powrow"><span>🔊 Sound effects</span><button data-p="__sound" class="'
+      + (soundOn() ? 'on' : 'off') + '">' + (soundOn() ? 'ON' : 'OFF') + '</button></div>';
     Object.keys(POWER_INFO).filter(k => hasPower(k) && !wyrIds.has(k)).forEach(k => { const on = unlocks.powersOn[k] !== false;
       html += '<div class="powrow"><span>⭐ ' + POWER_INFO[k] + '</span><button data-p="' + k + '" class="' + (on ? 'on' : 'off') + '">' + (on ? 'ON' : 'OFF') + '</button></div>'; });
     WYR_PAIRS.forEach((pair, i) => { if (!hasPower(pair[0].id) && !hasPower(pair[1].id)) return;   // once earned, switch freely
@@ -1231,8 +1434,19 @@
     unlocks.powers[chosen.id] = true; unlocks.powersOn[chosen.id] = true; unlocks.powers[other.id] = false; unlocks.powersOn[other.id] = false; saveUnlocks(); renderPowers(); }
   powersList.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation();
     if (b.dataset.wyr !== undefined) { switchWyr(+b.dataset.wyr, +b.dataset.opt); return; }
-    const k = b.dataset.p; const cur = unlocks.powersOn[k] !== false; unlocks.powersOn[k] = !cur; saveUnlocks(); renderPowers(); });
+    const k = b.dataset.p;
+    // The sound switch is not a power, so it is kept on the save itself
+    // rather than in powersOn with the things you earned.
+    if (k === '__sound') { unlocks.sound = !soundOn(); saveUnlocks(); renderPowers(); if (soundOn()) beep('key'); return; }
+    const cur = unlocks.powersOn[k] !== false; unlocks.powersOn[k] = !cur; saveUnlocks(); renderPowers(); });
   powersClose.addEventListener('click', e => { e.stopPropagation(); powersEl.classList.add('hidden'); overlay.classList.remove('hidden'); renderMenu(); });
+
+  const achvEl = $('achv');
+  function showAchievements() { renderAchievements(); overlay.classList.add('hidden'); achvEl.classList.remove('hidden'); }
+  $('achvBtn').addEventListener('click', e => { e.stopPropagation(); showAchievements(); });
+  $('achvClose').addEventListener('click', e => { e.stopPropagation(); achvEl.classList.add('hidden'); overlay.classList.remove('hidden'); renderMenu(); });
+  $('exportBtn').addEventListener('click', e => { e.stopPropagation(); exportSave(); });
+  $('importBtn').addEventListener('click', e => { e.stopPropagation(); importSave(); });
   function applyReward(rw) {
     if (rw.kind === 'hammer') { if (!unlocks.hammers.includes(rw.val)) unlocks.hammers.push(rw.val); equip(rw.val); }
     else if (rw.kind === 'betterHammer') { if (!unlocks.hammers.includes(rw.val)) unlocks.hammers.push(rw.val); equip(rw.val); }
@@ -1305,16 +1519,43 @@
   });
 
   // ================= INPUT + OVERLAY =================
-  document.addEventListener('mousemove', e => { hammer.style.left = e.clientX + 'px'; hammer.style.top = e.clientY + 'px';
-    hatEl.style.left = e.clientX + 'px'; hatEl.style.top = e.clientY + 'px'; mouseX = e.clientX; mouseY = e.clientY; });
-  document.addEventListener('mousedown', e => {
+  function aimAt(x, y) {
+    hammer.style.left = x + 'px'; hammer.style.top = y + 'px';
+    hatEl.style.left = x + 'px'; hatEl.style.top = y + 'px';
+    mouseX = x; mouseY = y;
+  }
+  document.addEventListener('mousemove', e => aimAt(e.clientX, e.clientY));
+
+  /* ------------------------------------------------------------- touch
+     The whole game was mousemove and mousedown, so on a phone the hammer
+     sat in the corner and never followed your finger -- and with
+     cursor:none everywhere there was nothing else to aim with either.
+
+     A touch puts the hammer under your finger first and then whacks, so
+     the swing lands where you tapped rather than where the mouse last
+     was. preventDefault stops the tap turning into a scroll, a zoom, or a
+     synthesised click a moment later that would whack twice.           */
+  function touchPoint(e) { const t = e.touches[0] || e.changedTouches[0]; return t ? { x: t.clientX, y: t.clientY } : null; }
+  document.addEventListener('touchstart', e => {
+    const p = touchPoint(e); if (!p) return;
+    if (e.target && e.target.closest && e.target.closest('button')) return;   // let the UI take its own taps
+    aimAt(p.x, p.y);
+    e.preventDefault();
+    whackAt(p.x, p.y, e.target);
+  }, { passive: false });
+  document.addEventListener('touchmove', e => {
+    const p = touchPoint(e); if (!p) return;
+    if (running) e.preventDefault();          // no scrolling the board out from under yourself
+    aimAt(p.x, p.y);
+  }, { passive: false });
+  /* One swing, wherever it came from -- a mouse button or a finger. */
+  function whackAt(x, y, target) {
     if (!running || picking) return;
-    if (e.target && e.target.closest && e.target.closest('button')) return;   // clicks on UI buttons aren't whacks
+    if (target && target.closest && target.closest('button')) return;   // taps on UI buttons aren't whacks
     hammer.classList.add('swing'); setTimeout(() => hammer.classList.remove('swing'), 120);
-    const x = e.clientX, y = e.clientY;
     if (mode === 'versus') { vsWhack(x, y, 'p1'); return; }
-    if (mode === 'classic' && bossActive && e.target.closest) { const bel = e.target.closest('.bossmini'); if (bel) { const b = bosses.find(z => z.el === bel); if (b) hitBossEntity(b, x, y); return; } }
-    const holeEl = e.target.closest ? e.target.closest('.hole') : null; if (!holeEl) return;
+    if (mode === 'classic' && bossActive && target && target.closest) { const bel = target.closest('.bossmini'); if (bel) { const b = bosses.find(z => z.el === bel); if (b) hitBossEntity(b, x, y); return; } }
+    const holeEl = target && target.closest ? target.closest('.hole') : null; if (!holeEl) return;
     const hole = holes.find(h => h.el === holeEl);
     if (mode === 'classic') {
       if (hole && hole.up) { const t = hole.type; if (!isKeyType(t)) missStreak = 0;
@@ -1329,11 +1570,12 @@
         else if (isKeyType(t)) collectKey(hole, x, y);
         else if (t === 'dragonHead') hitDragonHead(hole, x, y);
         if (isBetter('aoe') && t === 'hog') aoeHit(hole);
-        if (isBetter('rocket') && t === 'hog') megaHit(hole);
+        if ((isBetter('rocket') || isBetter('storm')) && t === 'hog') megaHit(hole);
       } else classicMiss(x, y);
       updateHud();
     } else { if (hole && hole.up) { if (hole.type === 'sonic') catchDailySonic(hole, x, y); else if (hole.type === 'hog') dailyStrike(hole, x, y); } }
-  });
+  }
+  document.addEventListener('mousedown', e => whackAt(e.clientX, e.clientY, e.target));
 
   function showOverlay(title, msg, view) { quitBtn.classList.add('hidden'); roundKeysEl.classList.add('hidden'); overlay.querySelector('h1').textContent = title;
     introEl.innerHTML = msg + '<br><br><span style="opacity:.8">Pick a mode to play again:</span>'; renderMenu(); renderBoardView(view); updateWinBanner(); overlay.classList.remove('hidden'); }
