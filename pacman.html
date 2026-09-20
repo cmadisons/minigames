@@ -291,6 +291,24 @@
     const PAC_SPEED = 2;
     function ghostSpeed() { return 2; }
 
+    /*
+      Ghosts get quicker as the levels go by.
+
+      Not by raising that number, though. A ghost only turns when it is exactly
+      on a tile boundary, so its speed has to divide the 16px tile -- the next
+      value up from 2 is 4, which is double, and the one the eyes already use.
+      So instead the ghosts take a SECOND two-pixel step on some frames: the
+      lattice is untouched, every step still checks for a boundary, and the
+      effective speed slides smoothly from 2 up to 4.
+
+      Level 1 never doubles. By level 9 every frame doubles, and the ghosts are
+      as fast as a pair of eyes going home -- which is fast enough that the
+      power pellets stop being optional.
+    */
+    const BOOST_WINDOW = 8;
+    function ghostBoost() { return Math.max(0, Math.min(BOOST_WINDOW, level - 1)); }
+    let frameNo = 0;
+
     function isWall(r, c) {
       if (r < 0 || r >= ROWS) return true;
       // horizontal tunnel wrap on the middle row
@@ -308,6 +326,9 @@
       for (let r = 0; r < ROWS; r++)
         for (let c = 0; c < COLS; c++)
           if (grid[r][c] === "." || grid[r][c] === "o") pelletsLeft++;
+      // The fruit is timed off how much of the maze you have cleared, so it
+      // needs to know how big the maze was to begin with.
+      pelletsAtStart = pelletsLeft;
     }
 
     function spawnEntities() {
@@ -397,6 +418,7 @@
     }
 
     function eatAt(r, c) {
+      eatFruit(r, c);
       const cell = grid[r][c];
       if (cell === ".") { grid[r][c] = " "; score += 10; pelletsLeft--; onScore(); }
       else if (cell === "o") {
@@ -450,6 +472,66 @@
         if (dd < bestD) { bestD = dd; bestDir = dir; }
       }
       g.dir = bestDir;
+    }
+
+    /* ------------------------------------------------------------ the fruit
+       The bonus fruit, in the middle of the maze just under the ghost house,
+       where the arcade has always put it. It turns up twice a maze -- once
+       when you have eaten a third of the dots and again at two thirds -- and
+       it only stays about nine seconds, so it is a decision rather than a
+       freebie: the middle is the worst place on the board to be.
+
+       What it is worth, and what it looks like, both climb with the level and
+       then stop, the way the original's did.                                */
+    const FRUITS = [
+      { em: "🍒", pts: 100 }, { em: "🍓", pts: 300 }, { em: "🍊", pts: 500 },
+      { em: "🍎", pts: 700 }, { em: "🍈", pts: 1000 }, { em: "🔔", pts: 2000 },
+      { em: "🔑", pts: 5000 }
+    ];
+    const FRUIT_FRAMES = 9 * 60;      // how long it hangs about
+    let fruit = null;                 // { r, c, left } or null
+    let fruitsShown = 0;              // how many have appeared this maze
+    let pelletsAtStart = 0;
+
+    function fruitKind() { return FRUITS[Math.min(level - 1, FRUITS.length - 1)]; }
+
+    /* Just below the ghost house, or the nearest open tile to it. The maze
+       changes between builds, so the spot is found rather than hardcoded. */
+    function fruitSpot() {
+      for (let down = 3; down <= 6; down++) {
+        const r = PEN.r + down;
+        if (r < ROWS && grid[r] && grid[r][PEN.c] !== "#" && grid[r][PEN.c] !== "-") {
+          return { r: r, c: PEN.c };
+        }
+      }
+      return { r: PEN.r, c: PEN.c };
+    }
+
+    function fruitTick() {
+      if (fruit) {
+        fruit.left--;
+        if (fruit.left <= 0) fruit = null;
+        return;
+      }
+      if (fruitsShown >= 2 || pelletsAtStart === 0) return;
+      const eaten = pelletsAtStart - pelletsLeft;
+      const due = fruitsShown === 0 ? pelletsAtStart / 3 : (pelletsAtStart * 2) / 3;
+      if (eaten >= due) {
+        const at = fruitSpot();
+        fruit = { r: at.r, c: at.c, left: FRUIT_FRAMES };
+        fruitsShown++;
+        statusEl.textContent = fruitKind().em + " Bonus " + fruitKind().pts + " — be quick!";
+      }
+    }
+
+    /* Eaten by being on its tile, the same rule the pellets use. */
+    function eatFruit(r, c) {
+      if (!fruit || fruit.r !== r || fruit.c !== c) return;
+      const f = fruitKind();
+      score += f.pts;
+      fruit = null;
+      onScore();
+      statusEl.textContent = f.em + " +" + f.pts + "!";
     }
 
     function snap(v, step) { return Math.round(v / step) * step; }
@@ -539,6 +621,8 @@
 
     function winLevel() {
       level++;
+      fruit = null;
+      fruitsShown = 0;
       statusEl.textContent = "🎉 Maze cleared! Level " + level + "…";
       buildGrid();
       resetPositions();
@@ -574,8 +658,16 @@
       movePac();
       checkGhostCollisions();
       if (!running) return;
-      ghosts.forEach(moveGhost);
+      frameNo++;
+      // Frightened ghosts and eyes keep their own speeds; only a ghost that is
+      // actually hunting you gets the extra step.
+      const second = (frameNo % BOOST_WINDOW) < ghostBoost();
+      ghosts.forEach(g => {
+        moveGhost(g);
+        if (second && !g.eyes && !g.fright) moveGhost(g);
+      });
       checkGhostCollisions();
+      fruitTick();
       mouth += mouthDir * 0.14;
       if (mouth > 0.35 || mouth < 0) mouthDir *= -1;
     }
@@ -604,6 +696,17 @@
             ctx.fillStyle = "#ffd23f";
             ctx.beginPath(); ctx.arc(x + TS / 2, y + TS / 2, 5, 0, 7); ctx.fill();
           }
+        }
+      }
+      if (fruit) {
+        const f = fruitKind();
+        // Blink out over the last second and a half, so you can see it going.
+        const going = fruit.left < 90 && Math.floor(fruit.left / 8) % 2 === 0;
+        if (!going) {
+          ctx.font = (TS - 1) + "px serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(f.em, fruit.c * TS + TS / 2, fruit.r * TS + TS / 2 + 1);
         }
       }
       drawPac();
@@ -668,6 +771,7 @@
     function startGame() {
       buildGrid();
       score = 0; lives = 3; level = 1;
+      fruit = null; fruitsShown = 0; frameNo = 0;
       best = loadHigh();
       running = true;
       mouth = 0.05; mouthDir = 1;

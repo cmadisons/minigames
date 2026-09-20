@@ -77,11 +77,47 @@
     .board .empty { color: var(--muted); font-style: italic; font-size: 0.82rem; }
     footer { margin-top: 40px; color: var(--muted); font-size: 0.8rem; }
 
+    .tools { display: flex; gap: 10px; align-items: center; justify-content: center;
+             flex-wrap: wrap; width: 100%; max-width: 760px; margin: 0 0 22px; }
+    .tools input {
+      flex: 1 1 260px; background: var(--card); color: var(--text);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 12px;
+      padding: 11px 14px; font: inherit; font-size: 0.95rem;
+    }
+    .tools input::placeholder { color: var(--muted); }
+    .tools input:focus { outline: none; border-color: var(--accent); }
+    .tools .back {
+      text-decoration: none; color: var(--muted); background: var(--card);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 12px;
+      padding: 11px 14px; font-size: 0.9rem; white-space: nowrap;
+    }
+    .tools .back:hover { color: var(--text); border-color: var(--accent); }
+    .empty-all { color: var(--muted); font-style: italic; margin-bottom: 18px; }
+    .card.hide { display: none; }
+    @media (max-width: 560px) {
+      body { padding: 24px 12px; }
+      h1 { font-size: 2rem; }
+      /* Two across instead of one: fifteen cards in a single column is a
+         very long scroll on a phone. */
+      .grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+      a.game { padding: 18px 12px 12px; }
+      .icon { font-size: 2.2rem; }
+      .name { font-size: 1rem; }
+      .desc { font-size: 0.76rem; }
+      .board { padding: 0 10px 12px; }
+    }
+
   </style>
 </head>
 <body>
   <h1>🎮 Minigames</h1>
   <p class="subtitle">Pick a game to play</p>
+
+  <div class="tools">
+    <input id="q" type="search" placeholder="Search the games…" autocomplete="off" aria-label="Search the games">
+    <a class="back" href="https://cmadisons.github.io/app-arcade/">🕹️ App Arcade</a>
+  </div>
+  <p class="empty-all" id="none" hidden>Nothing matches that.</p>
 
   <div class="grid">
     <div class="card">
@@ -90,6 +126,7 @@
         <span class="name">Rock Paper Scissors</span>
         <span class="desc">Beat the computer, best of luck</span>
       </a>
+      <div class="board" data-key="records-rock-paper-scissors" data-dir="desc" data-unit="in a row"></div>
     </div>
     <div class="card">
       <a class="game" href="1-100.html">
@@ -226,6 +263,25 @@
           "</li>").join("") + "</ol>";
       }
       el.innerHTML = html;
+    });
+
+    /* Fifteen cards is more than you can take in at a glance, so the box
+       filters them. It matches the blurb as well as the name, which is why
+       "dodge" finds Pac-Man and "computer" finds both Chess and Rock Paper
+       Scissors. */
+    var box = document.getElementById("q");
+    var none = document.getElementById("none");
+    var cards = Array.prototype.slice.call(document.querySelectorAll(".card"));
+    box.addEventListener("input", function () {
+      var want = box.value.trim().toLowerCase();
+      var shown = 0;
+      cards.forEach(function (c) {
+        var link = c.querySelector("a.game");
+        var hit = !want || (link && link.textContent.toLowerCase().indexOf(want) >= 0);
+        c.classList.toggle("hide", !hit);
+        if (hit) shown++;
+      });
+      none.hidden = shown > 0;
     });
   </script>
 </body>

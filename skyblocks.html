@@ -79,6 +79,8 @@
     .b-sunwood{ background: #e0913f; box-shadow: inset 0 0 0 1px rgba(0,0,0,.22), inset 3px 0 0 rgba(255,255,255,.1); }
     .b-frond  { background: #5fe0b0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); }
     .b-glimmer{ background: #f2dfa0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.16); }
+    .b-skyglass { background: rgba(191,234,255,.42); box-shadow: inset 0 0 0 1px rgba(255,255,255,.55); }
+    .b-rime   { background: #dff3ff; box-shadow: inset 0 0 0 1px rgba(120,190,230,.7), inset 2px 2px 0 rgba(255,255,255,.65); }
     .b-aether { background: #6fd2f5; box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); }
     .b-ember  { background: #ff5f8f; box-shadow: inset 0 0 0 1px rgba(255,220,120,.4); animation: pulse 1.7s ease-in-out infinite; }
     .b-sprout, .b-grain, .b-sunroot, .b-dewmelon { background: transparent; }
@@ -179,6 +181,8 @@
     <p class="hint">
       <b>Mine:</b> tap a block. <b>Build:</b> pick one from your bag, tap empty sky beside the isle.<br>
       Put <b>one empty square between 💧 Aether and 🔥 Emberflow</b> and it fills with Rubble — mine it, it fills again. Endless blocks.<br>
+      Leave a gap between <b>🔥 Emberflow and Glimmersand</b> and you get <b>Skyglass</b> instead — sand and heat, same as a furnace.<br>
+      Build up to the <b>top four rows</b> and leave a gap beside 💧 Aether with no fire near it: it is cold up there, and the water turns to <b>Rime</b>. Rime sells for more than anything else you can make.<br>
       <b>Farm:</b> plant 🌾 seeds on Loam, wait for them to ripen, then tap to harvest.
     </p>
   </section>
@@ -266,7 +270,8 @@
     /* ===================== blocks (original set) ===================== */
     const AIR = 0, MOSS = 1, LOAM = 2, PALE = 3, RUBBLE = 4, SUNWOOD = 5, FROND = 6,
           GLIMMER = 7, AETHER = 8, EMBER = 9, SPROUT = 10,
-          GRAIN = 11, SUNROOT = 12, DEWMELON = 13;
+          GRAIN = 11, SUNROOT = 12, DEWMELON = 13,
+          SKYGLASS = 14, RIME = 15;
 
     const B = {
       [MOSS]:     { key: "moss",    name: "Mosscap",     emoji: "",   color: "#3fd1a7", sell: 1,  skill: "foraging", xp: 1 },
@@ -282,11 +287,13 @@
       [GRAIN]:    { key: "grain",   name: "Goldgrain",   emoji: "🌾", color: "#f2dfa0", sell: 6,  skill: "farming",  xp: 4 },
       [SUNROOT]:  { key: "sunroot", name: "Sunroot",     emoji: "🥕", color: "#ff9d6b", sell: 9,  skill: "farming",  xp: 6 },
       [DEWMELON]: { key: "dewmelon",name: "Dewmelon",    emoji: "🍈", color: "#5fe0b0", sell: 14, skill: "farming",  xp: 9 },
+      [SKYGLASS]: { key: "skyglass",name: "Skyglass",    emoji: "",   color: "#bfeaff", sell: 8,  skill: "mining",   xp: 5 },
+      [RIME]:     { key: "rime",    name: "Rime",        emoji: "",   color: "#dff3ff", sell: 12, skill: "mining",   xp: 7 },
     };
-    const SOLID = new Set([MOSS, LOAM, PALE, RUBBLE, SUNWOOD, FROND, GLIMMER]);
+    const SOLID = new Set([MOSS, LOAM, PALE, RUBBLE, SUNWOOD, FROND, GLIMMER, SKYGLASS, RIME]);
     const CROPS = [GRAIN, SUNROOT, DEWMELON];
     const DROPS = { [MOSS]: LOAM };
-    const PLACEABLE = [LOAM, RUBBLE, PALE, GLIMMER, SUNWOOD, FROND, SPROUT, AETHER, EMBER, GRAIN, SUNROOT, DEWMELON];
+    const PLACEABLE = [LOAM, RUBBLE, PALE, GLIMMER, SKYGLASS, RIME, SUNWOOD, FROND, SPROUT, AETHER, EMBER, GRAIN, SUNROOT, DEWMELON];
 
     /* ========================= fish + beasts ========================= */
     const FISH = [
@@ -354,7 +361,7 @@
 
     /* ======================= collections ======================== */
     const COLL_TIERS = [50, 250, 1000, 5000, 25000];
-    const COLL_ITEMS = [RUBBLE, PALE, SUNWOOD, GLIMMER, LOAM, GRAIN, SUNROOT, DEWMELON];
+    const COLL_ITEMS = [RUBBLE, PALE, SUNWOOD, GLIMMER, SKYGLASS, RIME, LOAM, GRAIN, SUNROOT, DEWMELON];
 
     /* ========================== quests ========================== */
     const QUESTS = [
@@ -912,15 +919,30 @@
     });
 
     /* =========================== tick =========================== */
+    /* Above this row the isle is cold enough for Aether to freeze. */
+    const FREEZE_ROW = 4;
+
     function tick() {
       const now = Date.now();
       let changed = false;
 
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
         if (S.grid[idx(r, c)] !== AIR) continue;
-        let w = false, l = false;
-        for (const [nr, nc] of nb(r, c)) { const n = at(nr, nc); if (n === AETHER) w = true; else if (n === EMBER) l = true; }
+        let w = false, l = false, sand = false;
+        for (const [nr, nc] of nb(r, c)) {
+          const n = at(nr, nc);
+          if (n === AETHER) w = true;
+          else if (n === EMBER) l = true;
+          else if (n === GLIMMER) sand = true;
+        }
+        // Water meeting fire still makes Rubble, and it is checked first so
+        // the oldest generator on the isle keeps working the way it did.
         if (w && l) { S.grid[idx(r, c)] = RUBBLE; S.stats.made++; changed = true; }
+        // Heat on sand makes Skyglass, the way a furnace would.
+        else if (l && sand) { S.grid[idx(r, c)] = SKYGLASS; S.stats.made++; changed = true; }
+        // And up in the cold at the top of the isle, still water freezes.
+        // Nothing else rewards building high, so this does.
+        else if (w && !l && r <= FREEZE_ROW) { S.grid[idx(r, c)] = RIME; S.stats.made++; changed = true; }
       }
       for (const key of Object.keys(S.saplings)) {
         const i = Number(key);
@@ -986,7 +1008,7 @@
       collectBot, botTick, botSecs, botUpCost,
       lvlOf, levelFromXp, xpForLevel, addXp, bagValue, countSolid, score, maxHp,
       currentQuest, QUESTS, FISH, FOES, RODS, PICKS, SWORDS, SEEDS, BOTS, B, RAR, COLL_TIERS, COLL_ITEMS, SKILLS,
-      C: { AIR, MOSS, LOAM, PALE, RUBBLE, SUNWOOD, FROND, GLIMMER, AETHER, EMBER, SPROUT, GRAIN, SUNROOT, DEWMELON, COLS, ROWS, BOT_CAP, MAX_BOTS },
+      C: { AIR, MOSS, LOAM, PALE, RUBBLE, SUNWOOD, FROND, GLIMMER, SKYGLASS, RIME, AETHER, EMBER, SPROUT, GRAIN, SUNROOT, DEWMELON, COLS, ROWS, BOT_CAP, MAX_BOTS },
       sel: v => { selected = v; },
     };
   })();

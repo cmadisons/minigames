@@ -5,6 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doodle Jump</title>
   <style>
+    .scores { width: 100%; max-width: 360px; margin: 24px auto 0; }
+    .scores h2 { font-size: .95rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+    #score-list { list-style: none; counter-reset: rank; padding: 0; margin: 0; }
+    #score-list li {
+      counter-increment: rank;
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 14px; margin-bottom: 5px;
+      background: var(--panel); border-radius: 9px; font-size: .94rem;
+    }
+    #score-list li::before {
+      content: counter(rank); flex: none; width: 1.5rem; text-align: right;
+      color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums;
+    }
+    #score-list li:nth-child(1) { background: #2a2545; }
+    #score-list li:nth-child(1)::before { content: "🥇"; }
+    #score-list li:nth-child(2)::before { content: "🥈"; }
+    #score-list li:nth-child(3)::before { content: "🥉"; }
+    #score-list .s { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+    #score-list .m { color: var(--muted); font-size: .82rem; }
+    #score-list .d { margin-left: auto; color: var(--muted); font-size: .8rem; }
+    #score-list li.empty { justify-content: center; color: var(--muted); }
+    #score-list li.empty::before { content: ""; width: 0; }
+    .btn.ghost { background: transparent; border: 1px solid #2a3a5e; color: var(--muted); }
     :root {
       --bg: #1a1a2e;
       --panel: #16213e;
@@ -141,6 +164,12 @@
     <strong>propeller</strong> to fly. Land on a monster's head or shoot it — anything else kills you.
   </p>
 
+  <section class="scores">
+    <h2>🏆 Top 10 climbs</h2>
+    <ol id="score-list"></ol>
+    <button class="btn ghost" id="reset-scores">Reset high scores</button>
+  </section>
+
   <script>
     const W = 400, H = 620;
     const HS_KEY = "records-doodle-jump";   // shared leaderboard format the menu reads
@@ -181,6 +210,28 @@
       a.push(entry); if (a.length > 50) a = a.slice(-50);
       localStorage.setItem(key, JSON.stringify(a));
     }
+    /*
+      The board.
+
+      Every run has always been written to records-doodle-jump -- the shared
+      format the arcade menu reads -- but the page only ever reduced that list
+      to its single largest number and showed it as "Best". The runs were all
+      sitting there unread, so here they are: the top ten, with how high you
+      got and when.
+    */
+    function renderScores() {
+      const list = document.getElementById("score-list");
+      if (!list) return;
+      let a; try { a = JSON.parse(localStorage.getItem(HS_KEY)) || []; } catch (e) { a = []; }
+      a = a.filter(r => r && r.score > 0).sort((x, y) => y.score - x.score).slice(0, 10);
+      if (!a.length) { list.innerHTML = '<li class="empty">No climbs yet — have a go!</li>'; return; }
+      list.innerHTML = a.map(e =>
+        '<li><span class="s">' + e.score + '</span>' +
+        '<span class="m">' + (e.mode || "") + '</span>' +
+        '<span class="d">' + new Date(e.date).toLocaleDateString() + '</span></li>'
+      ).join("");
+    }
+
     function loadHigh() {
       let a; try { a = JSON.parse(localStorage.getItem(HS_KEY)) || []; } catch (e) { a = []; }
       return a.reduce((m, r) => (r && r.score > m ? r.score : m), 0);
@@ -575,6 +626,7 @@
       startBtn.textContent = "Play Again";
       overlay.classList.remove("hidden");
       bestEl.textContent = Math.max(prevBest, score);
+      renderScores();
       updateHud();
     }
 
@@ -661,6 +713,13 @@
     // --- boot ---
     reset();
     bestEl.textContent = loadHigh();
+    renderScores();
+    document.getElementById("reset-scores").addEventListener("click", function () {
+      if (!confirm("Erase all high scores? This can't be undone.")) return;
+      try { localStorage.removeItem(HS_KEY); } catch (e) { }
+      renderScores();
+      bestEl.textContent = 0;
+    });
     updateHud();
     lastFrame = performance.now();
     raf = requestAnimationFrame(loop);
