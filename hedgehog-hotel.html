@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hedgehog Hotel</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --card: #16213e;
+      --card-back: #0f3460;
+      --accent: #e94560;
+      --text: #eaeaea;
+      --muted: #9aa0b5;
+      --good: #4cd18a;
+      --warn: #f1c40f;
+      --bad: #e94560;
+      --wood: #5a3d2b;
+      --wood-dark: #3a2718;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { overflow-x: hidden; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 68px 12px 24px;
+      text-align: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button { font: inherit; color: inherit; }
+    h1 { margin: 4px 0 8px; font-size: 1.7rem; }
+    .subtitle { color: var(--muted); font-size: 0.95rem; margin-bottom: 14px; line-height: 1.5; }
+    .hidden { display: none !important; }
+
+    /* --- top bar, same as the other games ------------------------------ */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 52px;
+      display: flex; align-items: center; gap: 10px; padding: 0 12px;
+      background: rgba(22,33,62,0.95); backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 1000;
+    }
+    .topbar .back {
+      text-decoration: none; color: #eaeaea; font-size: 1.2rem; line-height: 1;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 7px 13px; flex-shrink: 0;
+    }
+    .topbar .back:hover { border-color: #e94560; }
+    .topbar .spacer { flex: 1; }
+    .icon-btn {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 6px 11px; font-size: 1.1rem; cursor: pointer; line-height: 1;
+    }
+    .icon-btn:hover { border-color: var(--accent); }
+
+    .btn {
+      padding: 11px 24px; font-size: 1rem; font-weight: 700; border-radius: 10px; cursor: pointer;
+      background: var(--accent); border: none; color: #fff; transition: transform .1s, filter .1s;
+    }
+    .btn:hover { filter: brightness(1.1); }
+    .btn:active { transform: scale(.97); }
+    .btn.alt { background: transparent; border: 1px solid #555; color: var(--text); font-weight: 500; }
+    .btn.alt:hover { border-color: var(--accent); color: var(--accent); }
+    .btn:disabled { opacity: .45; cursor: default; filter: none; }
+
+    .panel {
+      width: 100%; max-width: 560px; background: var(--card); border-radius: 14px;
+      padding: 16px; margin-bottom: 14px; text-align: left; line-height: 1.5;
+    }
+    .panel h2 { font-size: 1.05rem; margin-bottom: 8px; text-align: center; }
+    .howto { list-style: none; padding: 0; }
+    .howto li { padding: 5px 0; display: flex; gap: 10px; align-items: flex-start; }
+    .howto li .n { flex: none; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--accent);
+      color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: .85rem; }
+    .legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 12px; font-size: .9rem; margin-top: 6px; }
+    .legend span.i { display: inline-block; width: 1.6rem; text-align: center; }
+    .start-buttons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 6px 0 16px; }
+
+    /* --- the top ten, the same board Pac-Man and Doodle Jump show ------- */
+    .scores { width: 100%; max-width: 360px; margin: 10px auto 0; }
+    .scores h2 { font-size: .95rem; text-transform: uppercase; letter-spacing: 1px; color: #999; margin-bottom: 10px; }
+    #score-list { list-style: none; counter-reset: rank; padding: 0; margin: 0; }
+    #score-list li {
+      counter-increment: rank;
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 14px; margin-bottom: 5px;
+      background: var(--card); border-radius: 9px; font-size: .94rem;
+    }
+    #score-list li::before {
+      content: counter(rank); flex: none; width: 1.5rem; text-align: right;
+      color: #999; font-weight: 700; font-variant-numeric: tabular-nums;
+    }
+    #score-list li:nth-child(1) { background: #2a2545; }
+    #score-list li:nth-child(1)::before { content: "\1F947"; }
+    #score-list li:nth-child(2)::before { content: "\1F948"; }
+    #score-list li:nth-child(3)::before { content: "\1F949"; }
+    #score-list li.me { outline: 2px solid var(--accent); }
+    #score-list .s { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+    #score-list .m { color: #999; font-size: .82rem; }
+    #score-list .d { margin-left: auto; color: #999; font-size: .8rem; }
+    #score-list li.empty { justify-content: center; color: #999; }
+    #score-list li.empty::before { content: ""; width: 0; }
+    .scores .ghost { background: transparent; border: 1px solid #2a3a5e; color: #999;
+      border-radius: 9px; padding: 8px 14px; margin-top: 8px; cursor: pointer; font: inherit; }
+
+    /* --- in-game HUD ---------------------------------------------------- */
+    #game { width: 100%; max-width: 560px; display: flex; flex-direction: column; align-items: center; }
+    .hud { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 8px; width: 100%; }
+    .score-box {
+      padding: 6px 12px; border-radius: 12px; background: var(--card); min-width: 74px;
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+    }
+    .score-box .label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; color: #8890a6; font-weight: 600; }
+    .score-box .value { font-size: 1.25rem; font-weight: bold; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .clockbar { width: 100%; height: 8px; background: #0f1a33; border-radius: 99px; overflow: hidden; margin-bottom: 8px; }
+    .clockbar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #f6d365, #fda085); transition: width .2s linear; }
+    .status { min-height: 1.4rem; font-size: .95rem; font-weight: 600; margin-bottom: 8px; color: var(--muted); }
+
+    /* --- the hotel building -------------------------------------------- */
+    .hotel { width: 100%; position: relative; }
+    .roof {
+      height: 58px; margin: 0 -6px; position: relative;
+      background: linear-gradient(#b0413e, #822f2d);
+      clip-path: polygon(8% 100%, 50% 0, 92% 100%);
+    }
+    .sign {
+      position: absolute; left: 50%; top: 30px; transform: translateX(-50%);
+      background: #ffd86b; color: #4a2a10; font-weight: 800; font-size: .78rem; letter-spacing: 1px;
+      padding: 3px 10px; border-radius: 6px; white-space: nowrap; box-shadow: 0 2px 0 #b8892e; z-index: 2;
+    }
+    .floors { background: var(--wood-dark); border-radius: 0 0 6px 6px; padding: 0 6px; }
+    .floor {
+      display: grid; grid-template-columns: 22px repeat(3, 1fr); gap: 6px; padding: 6px 0;
+      border-bottom: 6px solid var(--wood-dark); background: var(--wood);
+      margin: 0 -6px; padding-left: 6px; padding-right: 6px;
+    }
+    .floor .fl { font-size: .72rem; font-weight: 800; color: #e6c9a8; display: flex; align-items: center; justify-content: center;
+      writing-mode: vertical-rl; letter-spacing: 1px; }
+    .room {
+      position: relative; min-height: 76px; border-radius: 8px; cursor: pointer; overflow: hidden;
+      border: 2px solid rgba(0,0,0,.35); transition: transform .1s, box-shadow .15s, border-color .15s;
+      touch-action: manipulation; user-select: none; -webkit-user-select: none;
+    }
+    .room.cozy { background: linear-gradient(160deg, #7a3d2e, #4d2721); }
+    .room.cool { background: linear-gradient(160deg, #2f5d7c, #1c3448); }
+    .room .bg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 2.4rem; opacity: .35; pointer-events: none; }
+    .room .temp { position: absolute; top: 3px; right: 4px; font-size: .8rem; pointer-events: none; }
+    .room .tname { position: absolute; bottom: 3px; left: 0; right: 0; font-size: .6rem; color: rgba(255,255,255,.75);
+      pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; }
+    .room .occ { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+    .room .occ .hogwrap { font-size: 1.9rem; line-height: 1; }
+    .room .occ .nm { font-size: .62rem; font-weight: 700; background: rgba(0,0,0,.45); padding: 1px 5px; border-radius: 5px;
+      max-width: 95%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .room .mood { position: absolute; top: 3px; left: 4px; font-size: .85rem; pointer-events: none; }
+    .room .stay { position: absolute; left: 0; bottom: 0; height: 3px; background: rgba(255,255,255,.6); pointer-events: none; }
+    .room .req {
+      position: absolute; top: 2px; right: 2px; background: #fff; color: #222; border-radius: 10px 10px 2px 10px;
+      padding: 2px 5px; font-size: 1rem; pointer-events: none; animation: bob .7s ease-in-out infinite;
+      box-shadow: 0 2px 6px rgba(0,0,0,.4); display: flex; flex-direction: column; align-items: center;
+    }
+    .room .req .rt { height: 3px; width: 100%; background: #ddd; border-radius: 2px; margin-top: 1px; overflow: hidden; }
+    .room .req .rt i { display: block; height: 100%; background: var(--accent); }
+    .room.ringing { border-color: #fff; box-shadow: 0 0 12px rgba(255,255,255,.5); }
+    .room.fit-perfect { border-color: var(--good); box-shadow: 0 0 0 2px var(--good), 0 0 14px rgba(76,209,138,.6); }
+    .room.fit-some { border-color: var(--warn); box-shadow: 0 0 0 2px var(--warn); }
+    .room.fit-bad { border-color: #c0392b; opacity: .8; }
+    .room.taken { opacity: .55; }
+    .room.hover { transform: scale(1.05); }
+    .room.shake { animation: shake .35s; }
+    @keyframes bob { 50% { transform: translateY(-3px); } }
+    @keyframes shake { 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+
+    /* --- lobby / front desk ---------------------------------------------- */
+    .lobby {
+      width: 100%; background: linear-gradient(#3a2a44, #2a1f33); border-radius: 0 0 14px 14px;
+      padding: 8px 8px 10px; border-top: 6px solid #c79a4a; min-height: 170px;
+    }
+    .lobby-top { display: flex; justify-content: space-between; align-items: center; font-size: .8rem; color: #d9c7e8; margin-bottom: 6px; gap: 6px; }
+    .lobby-top .extras { font-size: 1.1rem; letter-spacing: 2px; }
+    .queue { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; min-height: 130px; align-items: flex-start; }
+    .queue .empty { color: #8a7a99; font-size: .85rem; align-self: center; }
+    .guest {
+      width: 104px; background: var(--card); border-radius: 12px; padding: 6px 5px 7px; position: relative;
+      touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+      border: 2px solid transparent; transition: border-color .12s, transform .12s;
+      animation: arrive .35s ease-out;
+    }
+    .guest.sel { border-color: var(--accent); transform: translateY(-3px); }
+    .guest.dragging { opacity: .35; }
+    .bubble {
+      background: #fff; color: #222; border-radius: 10px; padding: 3px 4px; font-size: 1rem; line-height: 1.25;
+      position: relative; margin-bottom: 7px; min-height: 26px; display: flex; flex-wrap: wrap; justify-content: center; gap: 1px;
+    }
+    .bubble::after { content: ""; position: absolute; bottom: -6px; left: 50%; margin-left: -6px;
+      border: 6px solid transparent; border-top-color: #fff; border-bottom: 0; }
+    .hogwrap { position: relative; display: inline-block; font-size: 2rem; line-height: 1; }
+    .hogwrap .hat { position: absolute; top: -.42em; left: 50%; transform: translateX(-30%) rotate(-12deg); font-size: .55em; }
+    .hogwrap .hog { display: inline-block; }
+    .guest .gname { font-size: .7rem; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .guest .party { position: absolute; top: 40px; right: 4px; font-size: .9rem; }
+    .pbar { height: 6px; background: #0f1a33; border-radius: 99px; overflow: hidden; margin-top: 4px; }
+    .pbar i { display: block; height: 100%; width: 100%; background: var(--good); }
+    .guest.curl { pointer-events: none; }
+    .guest.curl .hog { animation: curl 1.2s ease-in forwards; }
+    .guest.curl .hat { opacity: 0; }
+    @keyframes curl {
+      0% { transform: rotate(0) scale(1); }
+      40% { transform: rotate(360deg) scale(.7); filter: brightness(.7); }
+      100% { transform: translateX(160px) rotate(1080deg) scale(.6); opacity: 0; }
+    }
+    @keyframes arrive { from { transform: translateX(-30px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .drag-ghost { position: fixed; z-index: 2000; pointer-events: none; transform: translate(-50%, -60%) scale(1.05);
+      box-shadow: 0 10px 24px rgba(0,0,0,.5); animation: none; opacity: .95; }
+
+    /* --- service tray ---------------------------------------------------- */
+    .tray {
+      position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 1500;
+      width: calc(100% - 24px); max-width: 480px; background: #0f3460; border-radius: 16px; padding: 10px 12px 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.6); border: 2px solid #c79a4a; animation: slideUp .2s ease-out;
+    }
+    @keyframes slideUp { from { transform: translate(-50%, 30px); opacity: 0; } }
+    .tray .tt { font-size: .9rem; margin-bottom: 8px; }
+    .tray .items { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .tray .items button {
+      background: var(--card); border: 1px solid #33415e; border-radius: 10px; padding: 6px 2px; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; font-size: 1.5rem;
+    }
+    .tray .items button small { font-size: .58rem; color: var(--muted); margin-top: 2px; }
+    .tray .items button:hover { border-color: var(--accent); }
+    .tray .close { position: absolute; top: 6px; right: 8px; background: none; border: none; font-size: 1.1rem; cursor: pointer; color: var(--muted); }
+
+    /* --- overlays -------------------------------------------------------- */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(10,10,25,.82); z-index: 1800; display: flex;
+      align-items: flex-start; justify-content: center; overflow-y: auto; padding: 64px 12px 24px;
+    }
+    .sheet { width: 100%; max-width: 520px; background: var(--bg); border: 1px solid #2a3a5e; border-radius: 16px; padding: 18px 16px; }
+    .sheet h2 { font-size: 1.4rem; margin-bottom: 6px; }
+    .big-stars { font-size: 1.9rem; letter-spacing: 3px; margin: 6px 0; }
+    .sumrow { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+    .reviews { text-align: left; margin: 10px 0; display: flex; flex-direction: column; gap: 7px; }
+    .review { background: var(--card); border-radius: 10px; padding: 8px 10px; font-size: .9rem; line-height: 1.4; }
+    .review b { color: #ffd86b; }
+    .review .q { color: var(--muted); font-size: .8rem; }
+    .shop-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; text-align: left; }
+    .shop-item { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 12px; padding: 8px 10px; }
+    .shop-item .e { font-size: 1.8rem; flex: none; width: 2.2rem; text-align: center; }
+    .shop-item .info { flex: 1; min-width: 0; }
+    .shop-item .info b { display: block; font-size: .95rem; }
+    .shop-item .info small { color: var(--muted); font-size: .8rem; }
+    .shop-item button { flex: none; padding: 8px 12px; font-size: .88rem; }
+    .shop-item.owned { opacity: .6; }
+    .layout-ed { background: var(--wood-dark); border-radius: 10px; padding: 6px; margin-top: 6px; }
+    .layout-ed .row { display: grid; grid-template-columns: 22px repeat(3, 1fr); gap: 6px; margin-bottom: 6px; }
+    .layout-ed .row:last-child { margin-bottom: 0; }
+    .layout-ed .fl { font-size: .72rem; font-weight: 800; color: #e6c9a8; display: flex; align-items: center; justify-content: center; }
+    .ed-room { border-radius: 8px; padding: 4px 2px; display: flex; flex-direction: column; gap: 4px; align-items: center; }
+    .ed-room.cozy { background: #6a3528; } .ed-room.cool { background: #264d68; }
+    .ed-room button { width: 100%; background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.15); border-radius: 6px; cursor: pointer; padding: 3px 0; font-size: .75rem; }
+    .ed-room button .x { font-size: 1.2rem; display: block; }
+    .tip { font-size: .8rem; color: var(--muted); margin-top: 4px; }
+
+    .float { position: fixed; pointer-events: none; font-weight: 800; font-size: 1.05rem; z-index: 1900; white-space: nowrap;
+      text-shadow: 0 2px 4px rgba(0,0,0,.6); animation: floatUp 1.3s ease-out forwards; transform: translate(-50%, 0); }
+    .float.good { color: #b6ff6a; } .float.gold { color: #ffd86b; } .float.bad { color: #ff7a7a; }
+    @keyframes floatUp { to { transform: translate(-50%, -60px); opacity: 0; } }
+    .toast { position: fixed; left: 50%; top: 62px; transform: translateX(-50%); background: #0f3460; border: 1px solid #c79a4a;
+      padding: 8px 14px; border-radius: 10px; z-index: 1950; font-size: .9rem; max-width: calc(100% - 24px); box-shadow: 0 6px 16px rgba(0,0,0,.5); }
+
+    @media (max-width: 420px) {
+      .guest { width: 92px; }
+      .room { min-height: 68px; }
+      .room .bg { font-size: 2rem; }
+      .score-box { min-width: 64px; padding: 5px 8px; }
+      .score-box .value { font-size: 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="topbar">
+    <a class="back" href="index.html" title="Back to home">← Home</a>
+    <span class="spacer"></span>
+    <button class="icon-btn hidden" id="pause-btn" title="Pause">⏸️</button>
+    <button class="icon-btn hidden" id="menu-btn" title="Back to hotel menu">🏨</button>
+    <button class="icon-btn" id="mute-btn" title="Sound on/off">🔊</button>
+  </nav>
+
+  <!-- ===================== START SCREEN ===================== -->
+  <section id="start" style="width:100%;display:flex;flex-direction:column;align-items:center;">
+    <h1>🦔 Hedgehog Hotel</h1>
+    <p class="subtitle">Picky hedgehogs are checking in. Give each one the perfect room!</p>
+
+    <div class="panel">
+      <h2>How to play</h2>
+      <ol class="howto">
+        <li><span class="n">1</span><span>Hedgehog guests wait at the <b>front desk</b>. Their speech bubble shows what they want.</span></li>
+        <li><span class="n">2</span><span><b>Drag</b> a guest onto a room that matches (or <b>tap</b> the guest, then tap a room). Rooms glow <b style="color:var(--good)">green</b> when they are perfect!</span></li>
+        <li><span class="n">3</span><span>Hurry! If a guest waits too long, they curl into a spiky ball and leave. 😤</span></li>
+        <li><span class="n">4</span><span>When a room shows a bubble 🛎️, tap the room and pick the right thing from the tray.</span></li>
+        <li><span class="n">5</span><span>Happy guests pay coins 🪙 and stars ⭐. Spend coins in the shop after each day. A season is 7 days — get the most stars!</span></li>
+      </ol>
+      <h2 style="margin-top:10px">What the pictures mean</h2>
+      <div class="legend">
+        <div><span class="i">🍂</span>Leaf bed</div>
+        <div><span class="i">🌿</span>Moss bed</div>
+        <div><span class="i">🧦</span>Sock drawer</div>
+        <div><span class="i">☕</span>Teacup</div>
+        <div><span class="i">🪵</span>Hollow log</div>
+        <div><span class="i">🔥</span>Cozy (warm) room</div>
+        <div><span class="i">❄️</span>Cool room</div>
+        <div><span class="i">👇</span>Ground floor only (can't climb!)</div>
+        <div><span class="i">🤫</span>Wants quiet: no 🎺 next door</div>
+        <div><span class="i">🎺</span>Party hedgehog (noisy!)</div>
+        <div><span class="i">🐛🍓🪲</span>Snacks</div>
+        <div><span class="i">🧣🎧</span>Blanket, earmuffs</div>
+      </div>
+    </div>
+
+    <div class="start-buttons">
+      <button class="btn" id="play-btn">Open the hotel</button>
+      <button class="btn alt" id="shop-open-btn">🛍️ Shop</button>
+      <button class="btn alt" id="reset-hotel-btn">Reset hotel</button>
+    </div>
+    <p class="subtitle" id="save-info"></p>
+
+    <section class="scores">
+      <h2>🏆 Top 10 seasons</h2>
+      <ol id="score-list"></ol>
+      <button class="ghost" id="reset-scores">Reset high scores</button>
+    </section>
+  </section>
+
+  <!-- ===================== GAME SCREEN ===================== -->
+  <section id="game" class="hidden">
+    <div class="hud">
+      <div class="score-box"><span class="label">Day</span><span class="value" id="hud-day">1</span></div>
+      <div class="score-box"><span class="label">Coins</span><span class="value" id="hud-coins">0</span></div>
+      <div class="score-box"><span class="label">Stars today</span><span class="value" id="hud-stars">0</span></div>
+      <div class="score-box"><span class="label">Time</span><span class="value" id="hud-time">90</span></div>
+    </div>
+    <div class="clockbar"><i id="clock-fill"></i></div>
+    <div class="status" id="status">Guests are on their way…</div>
+
+    <div class="hotel">
+      <div class="roof"></div>
+      <div class="sign">🦔 HEDGEHOG HOTEL</div>
+      <div class="floors" id="floors"></div>
+      <div class="lobby">
+        <div class="lobby-top"><span>🛎️ Front desk</span><span class="extras" id="lobby-extras"></span></div>
+        <div class="queue" id="queue"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- service tray -->
+  <div class="tray hidden" id="tray">
+    <button class="close" id="tray-close" aria-label="Close">✖</button>
+    <div class="tt" id="tray-title"></div>
+    <div class="items" id="tray-items"></div>
+  </div>
+
+  <!-- end-of-day summary / shop / season end -->
+  <div class="overlay hidden" id="overlay"><div class="sheet" id="sheet"></div></div>
+  <div class="toast hidden" id="toast"></div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    // ================= DATA =================
+    const SAVE_KEY = "hhotel:save", TOP_KEY = "hhotel:top10", MUTE_KEY = "hhotel:mute";
+    const SEASON_DAYS = 7, DAY_LEN = 90, COLS = 3, MAX_FLOORS = 5, LOBBY_MAX = 5;
+
+    const TYPES = {
+      leaf:   { e: "🍂", n: "Leaf bed",    r: "leaf bed" },
+      moss:   { e: "🌿", n: "Moss bed",    r: "moss bed" },
+      sock:   { e: "🧦", n: "Sock drawer", r: "sock drawer" },
+      teacup: { e: "☕", n: "Teacup",      r: "teacup" },
+      log:    { e: "🪵", n: "Hollow log",  r: "hollow log" },
+    };
+    const TYPE_ORDER = ["leaf", "moss", "sock", "teacup", "log"];
+    const TEMPS = { cozy: { e: "🔥", n: "Cozy" }, cool: { e: "❄️", n: "Cool" } };
+    const ITEMS = {
+      worm:    { e: "🐛", n: "Mealworms" },
+      berry:   { e: "🍓", n: "Strawberries" },
+      beetle:  { e: "🪲", n: "Beetles" },
+      blanket: { e: "🧣", n: "Blanket" },
+      muffs:   { e: "🎧", n: "Earmuffs" },
+    };
+    const SNACK_IDS = ["worm", "berry", "beetle"];
+    const TRAY_ORDER = ["worm", "berry", "beetle", "blanket", "muffs"];
+
+    const NAMES = ["Prickles", "Sir Quillington", "Nutmeg", "Pip", "Hazel", "Bramble", "Conker", "Thistle",
+      "Mrs. Tiggy", "Spike", "Acorn", "Pudding", "Biscuit", "Lady Bristlewick", "Dr. Snuffles", "Clover",
+      "Pinecone", "Waffles", "Duchess Pokey", "Button", "Mr. Prickleton", "Truffle", "Snuffle", "Bean",
+      "Captain Quills", "Poppy", "Nibbles", "Chestnut", "Baron von Spike", "Muffin", "Tumble", "Fig"];
+    function hatFor(name) {
+      if (/^(Sir|Mr\.|Dr\.|Baron)/.test(name)) return "🎩";
+      if (/^(Duchess)/.test(name)) return "👑";
+      if (/^(Lady|Mrs\.)/.test(name)) return "👒";
+      if (/^Captain/.test(name)) return "🧢";
+      return pick(["", "", "", "🎀", "🌸", "🧢"]);
+    }
+
+    // ================= HELPERS =================
+    const $ = id => document.getElementById(id);
+    function rand(a, b) { return a + Math.random() * (b - a); }
+    function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+    function starStr(n) { n = Math.round(n); return "⭐".repeat(n) + "☆".repeat(Math.max(0, 5 - n)); }
+    function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+    function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+    function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
+    function lsDel(k) { try { localStorage.removeItem(k); } catch (e) { } }
+
+    // ================= SAVE =================
+    function freshSave() {
+      return {
+        day: 1, coins: 20, total: 0, floors: 2,
+        types: ["leaf", "moss"],
+        couch: false, bellhop: false, decor: [],
+        layout: [
+          { type: "leaf", temp: "cozy" }, { type: "moss", temp: "cool" }, { type: "leaf", temp: "cool" },
+          { type: "moss", temp: "cozy" }, { type: "leaf", temp: "cozy" }, { type: "moss", temp: "cool" },
+        ],
+        history: [],
+      };
+    }
+    let S = loadSave();
+    function loadSave() {
+      let s = null;
+      try { s = JSON.parse(lsGet(SAVE_KEY)); } catch (e) { s = null; }
+      const f = freshSave();
+      if (!s || typeof s !== "object") return f;
+      const out = Object.assign(f, s);
+      if (!Array.isArray(out.layout) || out.layout.length !== out.floors * COLS) out.layout = f.layout.slice(0, out.floors * COLS);
+      while (out.layout.length < out.floors * COLS) out.layout.push({ type: "leaf", temp: "cozy" });
+      return out;
+    }
+    function save() { lsSet(SAVE_KEY, JSON.stringify(S)); }
+    function decorBonus() { return S.decor.reduce((a, id) => a + ((SHOP.find(x => x.id === id) || {}).bonus || 0), 0); }
+
+    // ================= SOUND =================
+    let muted = lsGet(MUTE_KEY) === "1";
+    let AC = null;
+    function ac() {
+      if (muted) return null;
+      if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+      if (AC && AC.state === "suspended") AC.resume();
+      return AC;
+    }
+    function tone(freq, dur, type, vol, when, slideTo) {
+      const c = ac(); if (!c) return;
+      const t0 = c.currentTime + (when || 0);
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(freq, t0);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol || 0.12, t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(c.destination);
+      o.start(t0); o.stop(t0 + dur + 0.05);
+    }
+    function noise(dur, vol, when, freq) {
+      const c = ac(); if (!c) return;
+      const t0 = c.currentTime + (when || 0);
+      const buf = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+      const src = c.createBufferSource(); src.buffer = buf;
+      const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = freq || 900;
+      const g = c.createGain(); g.gain.value = vol || 0.2;
+      src.connect(f); f.connect(g); g.connect(c.destination);
+      src.start(t0);
+    }
+    const SFX = {
+      chime() { tone(880, 0.3, "sine", 0.14); tone(1318, 0.45, "sine", 0.11, 0.12); },
+      coin() { tone(988, 0.08, "square", 0.06); tone(1319, 0.25, "square", 0.06, 0.08); },
+      huff() { noise(0.35, 0.25, 0, 700); tone(260, 0.35, "sawtooth", 0.07, 0, 90); },
+      ring() { tone(1568, 0.12, "triangle", 0.1); tone(1568, 0.18, "triangle", 0.1, 0.16); },
+      wrong() { tone(240, 0.22, "square", 0.06, 0, 150); },
+      pop() { tone(620, 0.07, "triangle", 0.1); },
+      arrive() { tone(523, 0.1, "triangle", 0.08); tone(659, 0.14, "triangle", 0.08, 0.09); },
+      buy() { tone(660, 0.1, "triangle", 0.1); tone(880, 0.1, "triangle", 0.1, 0.1); tone(1175, 0.25, "triangle", 0.1, 0.2); },
+      fanfare() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.3, "triangle", 0.1, i * 0.13)); },
+    };
+    function renderMute() { $("mute-btn").textContent = muted ? "🔇" : "🔊"; }
+    $("mute-btn").addEventListener("click", () => {
+      muted = !muted; lsSet(MUTE_KEY, muted ? "1" : "0"); renderMute();
+      if (!muted) SFX.pop();
+    });
+    renderMute();
+
+    // ================= SHOP =================
+    const FLOOR_COST = [70, 120, 180];
+    const SHOP = [
+      { id: "floor", e: "🏗️", n: "Build a new floor", d: "3 more rooms for more guests.",
+        cost: () => FLOOR_COST[S.floors - 2], can: () => S.floors < MAX_FLOORS, owned: () => S.floors >= MAX_FLOORS,
+        buy() {
+          const f = S.floors; S.floors++;
+          for (let c = 0; c < COLS; c++) S.layout.push({ type: pick(S.types), temp: (f + c) % 2 ? "cool" : "cozy" });
+        } },
+      { id: "sock", e: "🧦", n: "Sock drawer rooms", d: "A new room type. Guests will ask for it (and pay more!).", cost: () => 45,
+        can: () => !S.types.includes("sock"), owned: () => S.types.includes("sock"), buy() { unlockType("sock"); } },
+      { id: "teacup", e: "☕", n: "Teacup rooms", d: "Tiny, fancy, very popular with Lady Bristlewick.", cost: () => 80,
+        can: () => !S.types.includes("teacup"), owned: () => S.types.includes("teacup"), buy() { unlockType("teacup"); } },
+      { id: "log", e: "🪵", n: "Hollow log rooms", d: "Rustic and woodsy. The fanciest room of all.", cost: () => 120,
+        can: () => !S.types.includes("log"), owned: () => S.types.includes("log"), buy() { unlockType("log"); } },
+      { id: "couch", e: "🛋️", n: "Waiting-room couch", d: "Guests at the desk lose patience slower.", cost: () => 55,
+        can: () => !S.couch, owned: () => S.couch, buy() { S.couch = true; } },
+      { id: "bellhop", e: "🛎️", n: "Hedgehog bellhop", d: "A helper who delivers snacks for you, all by himself.", cost: () => 130,
+        can: () => !S.bellhop, owned: () => S.bellhop, buy() { S.bellhop = true; } },
+      { id: "fern", e: "🪴", n: "Potted fern", bonus: 1, d: "+1 bonus ⭐ from every very happy guest.", cost: () => 35,
+        can: () => !S.decor.includes("fern"), owned: () => S.decor.includes("fern"), buy() { S.decor.push("fern"); } },
+      { id: "painting", e: "🖼️", n: "Hedgehog painting", bonus: 1, d: "+1 bonus ⭐ from every very happy guest.", cost: () => 65,
+        can: () => !S.decor.includes("painting"), owned: () => S.decor.includes("painting"), buy() { S.decor.push("painting"); } },
+      { id: "fountain", e: "⛲", n: "Lobby fountain", bonus: 2, d: "+2 bonus ⭐ from every very happy guest.", cost: () => 140,
+        can: () => !S.decor.includes("fountain"), owned: () => S.decor.includes("fountain"), buy() { S.decor.push("fountain"); } },
+    ];
+    function unlockType(t) {
+      S.types.push(t);
+      // turn the top-right room into the new type so it shows up right away
+      S.layout[S.layout.length - 1].type = t;
+    }
+
+    // ================= DAY STATE =================
+    let D = null;        // the day in progress
+    let sel = null;      // selected lobby guest id (tap-to-place)
+    let trayRoom = -1;   // room whose service tray is open
+    let nextId = 1;
+
+    function newDay() {
+      D = {
+        t: 0, spawnT: 1, running: true, paused: false,
+        lobby: [], rooms: new Array(S.floors * COLS).fill(null),
+        results: [], coins: 0, stars: 0, dirty: true,
+      };
+      sel = null; trayRoom = -1;
+    }
+    function floorOf(i) { return Math.floor(i / COLS); }
+    function neighbours(i) {
+      const f = floorOf(i), c = i % COLS, n = [];
+      if (c > 0) n.push(i - 1);
+      if (c < COLS - 1) n.push(i + 1);
+      if (f > 0) n.push(i - COLS);
+      if (f < S.floors - 1) n.push(i + COLS);
+      return n;
+    }
+    function noisyNext(i) { return neighbours(i).some(j => D.rooms[j] && D.rooms[j].noisy); }
+
+    function makeGuest() {
+      const day = S.day;
+      const r = Math.floor(Math.random() * S.layout.length);
+      const room = S.layout[r];
+      const want = { type: room.type };
+      const pool = ["temp", "quiet"];
+      if (floorOf(r) === 0) pool.push("ground");
+      const maxExtra = Math.min(3, Math.floor((day + 1) / 2));
+      let k = Math.floor(Math.random() * (maxExtra + 1));
+      if (day === 1 && Math.random() < 0.5) k = 0;
+      while (k-- > 0 && pool.length) {
+        const t = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+        if (t === "temp") want.temp = room.temp;
+        if (t === "ground") want.ground = true;
+        if (t === "quiet") want.quiet = true;
+      }
+      const name = pick(NAMES);
+      const pat = Math.max(15, 30 - (day - 1) * 2);
+      return {
+        id: nextId++, name, hat: hatFor(name), want,
+        noisy: !want.quiet && day >= 2 && Math.random() < 0.12 + day * 0.03,
+        snack: pick(SNACK_IDS), waited: 0, patience: pat, state: "lobby",
+        room: -1, stay: 0, stayMax: 0, nextReq: -1, req: null,
+        misses: [], waitFrac: 0, svcGood: 0, svcBad: 0, svcMiss: 0, hue: Math.floor(rand(-25, 25)),
+      };
+    }
+    function traitCount(g) { return 1 + (g.want.temp ? 1 : 0) + (g.want.ground ? 1 : 0) + (g.want.quiet ? 1 : 0); }
+    function unmet(g, i) {
+      const L = S.layout[i], m = [];
+      if (L.type !== g.want.type) m.push("type");
+      if (g.want.temp && L.temp !== g.want.temp) m.push("temp");
+      if (g.want.ground && floorOf(i) > 0) m.push("ground");
+      if (g.want.quiet && noisyNext(i)) m.push("quiet");
+      return m;
+    }
+    function starsFor(g) {
+      let s = 5 - 1.5 * g.misses.length;
+      if (g.waitFrac > 0.65) s -= 1; else if (g.waitFrac > 0.4) s -= 0.5;
+      s -= g.svcMiss * 1 + g.svcBad * 0.5;
+      s += g.svcGood * 0.5;
+      return clamp(Math.round(s), 1, 5);
+    }
+    function wantIcons(g) {
+      let h = TYPES[g.want.type].e;
+      if (g.want.temp) h += TEMPS[g.want.temp].e;
+      if (g.want.ground) h += "👇";
+      if (g.want.quiet) h += "🤫";
+      return h;
+    }
+
+    // ================= ACTIONS =================
+    function spawn() {
+      const g = makeGuest();
+      D.lobby.push(g); D.dirty = true; SFX.arrive();
+      setStatus(g.name + " is at the front desk!");
+    }
+    function tryPlace(id, i) {
+      const g = D.lobby.find(x => x.id === id && x.state === "lobby");
+      if (!g) return false;
+      const roomEl = document.querySelector('.room[data-i="' + i + '"]');
+      if (D.rooms[i]) { if (roomEl) { roomEl.classList.remove("shake"); void roomEl.offsetWidth; roomEl.classList.add("shake"); } SFX.wrong(); toast("That room is taken!"); return false; }
+      g.misses = unmet(g, i);
+      g.waitFrac = g.waited / g.patience;
+      g.state = "room"; g.room = i;
+      g.stayMax = g.stay = rand(16, 28);
+      const chance = Math.min(0.85, 0.45 + S.day * 0.06);
+      g.nextReq = Math.random() < chance ? rand(3, g.stay - 6) : -1;
+      D.lobby = D.lobby.filter(x => x !== g);
+      D.rooms[i] = g;
+      sel = null;
+      // a party hedgehog wakes up any quiet neighbours
+      if (g.noisy) neighbours(i).forEach(j => {
+        const n = D.rooms[j];
+        if (n && n.want.quiet && !n.req) { n.req = { kind: "muffs", t: 12, max: 12, age: 0 }; SFX.ring(); }
+      });
+      SFX.chime();
+      if (roomEl) {
+        if (!g.misses.length) floatAt(roomEl, "Perfect! 💚", "good");
+        else floatAt(roomEl, "Hmm… " + g.misses.map(missIcon).join(""), "bad");
+      }
+      setStatus(g.misses.length ? g.name + " checked in, but isn't thrilled." : g.name + " LOVES the room!");
+      D.dirty = true;
+      return true;
+    }
+    function missIcon(m) { return { type: "🛏️", temp: "🌡️", ground: "🪜", quiet: "🎺" }[m]; }
+
+    function leaveAngry(g) {
+      g.state = "leaving"; g.leaveT = 1.2; D.dirty = true;
+      D.results.push({ name: g.name, stars: 1, left: true, g });
+      if (sel === g.id) sel = null;
+      SFX.huff();
+      setStatus(g.name + " curled into a spiky ball and left! 😤");
+    }
+    function checkout(g, quiet) {
+      const s = starsFor(g);
+      let coins = Math.round((5 + 4 * traitCount(g)) * (0.3 + 0.7 * s / 5) * (1 + 0.08 * (S.day - 1))) + g.svcGood * 2;
+      const bonus = s >= 4 ? decorBonus() : 0;
+      D.coins += coins; D.stars += s + bonus;
+      D.results.push({ name: g.name, stars: s, coins, bonus, g });
+      D.rooms[g.room] = null;
+      if (trayRoom === g.room) closeTray();
+      if (!quiet) {
+        const el = document.querySelector('.room[data-i="' + g.room + '"]');
+        if (el) floatAt(el, "+" + coins + "🪙 +" + (s + bonus) + "⭐", "gold");
+        SFX.coin();
+      }
+      D.dirty = true;
+    }
+    function makeRequest(g) {
+      const L = S.layout[g.room];
+      const roll = Math.random();
+      let kind;
+      if (roll < 0.5) kind = g.snack;
+      else if (roll < (L.temp === "cool" ? 0.85 : 0.72)) kind = "blanket";
+      else kind = "muffs";
+      g.req = { kind, t: 12, max: 12, age: 0 };
+      SFX.ring(); D.dirty = true;
+    }
+    function deliver(item) {
+      const g = D && D.rooms[trayRoom];
+      if (!g || !g.req) { closeTray(); return; }
+      const el = document.querySelector('.room[data-i="' + trayRoom + '"]');
+      if (item === g.req.kind) {
+        g.svcGood++; g.req = null; SFX.pop(); SFX.coin();
+        if (el) floatAt(el, "Thank you! " + ITEMS[item].e, "good");
+        closeTray();
+      } else {
+        g.svcBad++; SFX.wrong();
+        if (el) floatAt(el, "That's not it! " + ITEMS[item].e, "bad");
+        toast(g.name + " wanted " + ITEMS[g.req.kind].e + " " + ITEMS[g.req.kind].n + ", not " + ITEMS[item].n + ".");
+      }
+      D.dirty = true;
+    }
+
+    // ================= MAIN LOOP =================
+    let last = 0, hudT = 0;
+    function loop(now) {
+      requestAnimationFrame(loop);
+      const dt = Math.min(0.1, (now - last) / 1000 || 0); last = now;
+      if (!D || !D.running || D.paused) return;
+      D.t += dt;
+      // arrivals
+      D.spawnT -= dt;
+      const active = D.lobby.filter(g => g.state === "lobby").length;
+      if (D.spawnT <= 0 && D.t < DAY_LEN - 8) {
+        if (active < LOBBY_MAX) spawn();
+        D.spawnT = Math.max(3.2, 8.5 - (S.day - 1) * 0.8) * rand(0.75, 1.25);
+      }
+      // lobby patience
+      for (const g of D.lobby.slice()) {
+        if (g.state === "leaving") {
+          g.leaveT -= dt;
+          if (g.leaveT <= 0) { D.lobby = D.lobby.filter(x => x !== g); D.dirty = true; }
+          continue;
+        }
+        g.waited += dt * (S.couch ? 0.65 : 1);
+        if (g.waited >= g.patience) leaveAngry(g);
+      }
+      // guests in rooms
+      for (const g of D.rooms) {
+        if (!g) continue;
+        g.stay -= dt;
+        if (!g.req && g.nextReq > 0) { g.nextReq -= dt; if (g.nextReq <= 0) { g.nextReq = -1; makeRequest(g); } }
+        if (g.req) {
+          g.req.t -= dt; g.req.age += dt;
+          if (S.bellhop && SNACK_IDS.includes(g.req.kind) && g.req.age > 2.5) {
+            g.svcGood++; g.req = null; D.dirty = true;
+            const el = document.querySelector('.room[data-i="' + g.room + '"]');
+            if (el) floatAt(el, "🛎️ Bellhop delivered!", "good");
+            SFX.pop();
+            if (trayRoom === g.room) closeTray();
+          } else if (g.req.t <= 0) {
+            g.svcMiss++; g.req = null; D.dirty = true; SFX.huff();
+            const el = document.querySelector('.room[data-i="' + g.room + '"]');
+            if (el) floatAt(el, "Nobody came… 😠", "bad");
+            if (trayRoom === g.room) closeTray();
+          }
+        }
+        if (g.stay <= 0 && !g.req) checkout(g);
+      }
+      if (D.t >= DAY_LEN) { endDay(); return; }
+      if (D.dirty) { renderRooms(); renderLobby(); D.dirty = false; }
+      updateBars();
+      hudT -= dt; if (hudT <= 0) { renderHUD(); hudT = 0.2; }
+    }
+    requestAnimationFrame(loop);
+
+    // ================= RENDER =================
+    function hogHTML(g, big) {
+      return '<span class="hogwrap"' + (big ? "" : "") + '>' +
+        (g.hat ? '<span class="hat">' + g.hat + '</span>' : "") +
+        '<span class="hog" style="filter:hue-rotate(' + g.hue + 'deg)">🦔</span></span>';
+    }
+    function moodFace(g) { const s = starsFor(g); return s >= 5 ? "😍" : s >= 4 ? "😊" : s >= 3 ? "😐" : "😠"; }
+
+    function renderRooms() {
+      const wrap = $("floors");
+      const selG = sel != null ? D.lobby.find(x => x.id === sel && x.state === "lobby") : null;
+      let h = "";
+      for (let f = S.floors - 1; f >= 0; f--) {
+        h += '<div class="floor"><div class="fl">' + (f === 0 ? "GROUND" : "FLOOR " + f) + '</div>';
+        for (let c = 0; c < COLS; c++) {
+          const i = f * COLS + c, L = S.layout[i], g = D.rooms[i];
+          let cls = "room " + L.temp;
+          if (selG) {
+            if (g) cls += " taken";
+            else { const m = unmet(selG, i).length; cls += m === 0 ? " fit-perfect" : m === 1 ? " fit-some" : " fit-bad"; }
+          }
+          if (g && g.req) cls += " ringing";
+          h += '<div class="' + cls + '" data-i="' + i + '">' +
+            '<div class="bg">' + TYPES[L.type].e + '</div>' +
+            '<div class="temp">' + TEMPS[L.temp].e + '</div>';
+          if (g) {
+            h += '<div class="occ">' + hogHTML(g) + '<div class="nm">' + esc(g.name) + (g.noisy ? " 🎺" : "") + '</div></div>' +
+              '<div class="mood">' + moodFace(g) + '</div>' +
+              '<div class="stay" data-stay="' + i + '"></div>';
+            if (g.req) h += '<div class="req">' + ITEMS[g.req.kind].e + '<div class="rt"><i data-req="' + i + '"></i></div></div>';
+          } else {
+            h += '<div class="tname">' + TYPES[L.type].n + '</div>';
+          }
+          h += '</div>';
+        }
+        h += '</div>';
+      }
+      wrap.innerHTML = h;
+    }
+    function renderLobby() {
+      const q = $("queue");
+      let extras = "";
+      if (S.couch) extras += "🛋️";
+      if (S.bellhop) extras += "🦔🛎️";
+      S.decor.forEach(id => { extras += SHOP.find(x => x.id === id).e; });
+      $("lobby-extras").textContent = extras;
+      if (!D.lobby.length) { q.innerHTML = '<div class="empty">No guests waiting… ☕</div>'; return; }
+      q.innerHTML = D.lobby.map(g => {
+        const leaving = g.state === "leaving";
+        return '<div class="guest' + (sel === g.id ? " sel" : "") + (leaving ? " curl" : "") +
+          (drag && drag.id === g.id && drag.moved ? " dragging" : "") + '" data-id="' + g.id + '">' +
+          '<div class="bubble">' + (leaving ? "Hmph! 😤" : wantIcons(g)) + '</div>' +
+          hogHTML(g) + (g.noisy ? '<span class="party" title="Party hedgehog: noisy!">🎺</span>' : "") +
+          '<div class="gname">' + esc(g.name) + '</div>' +
+          '<div class="pbar"><i data-pat="' + g.id + '"></i></div></div>';
+      }).join("");
+    }
+    function updateBars() {
+      for (const g of D.lobby) {
+        const el = document.querySelector('[data-pat="' + g.id + '"]');
+        if (!el) continue;
+        const p = g.state === "leaving" ? 0 : clamp(1 - g.waited / g.patience, 0, 1);
+        el.style.width = (p * 100) + "%";
+        el.style.background = p > 0.5 ? "var(--good)" : p > 0.25 ? "var(--warn)" : "var(--bad)";
+      }
+      D.rooms.forEach((g, i) => {
+        if (!g) return;
+        const s = document.querySelector('[data-stay="' + i + '"]');
+        if (s) s.style.width = (clamp(g.stay / g.stayMax, 0, 1) * 100) + "%";
+        const r = document.querySelector('[data-req="' + i + '"]');
+        if (r && g.req) r.style.width = (clamp(g.req.t / g.req.max, 0, 1) * 100) + "%";
+      });
+    }
+    function renderHUD() {
+      $("hud-day").textContent = S.day + "/" + SEASON_DAYS;
+      $("hud-coins").textContent = S.coins + D.coins;
+      $("hud-stars").textContent = D.stars;
+      const left = Math.max(0, Math.ceil(DAY_LEN - D.t));
+      $("hud-time").textContent = left;
+      $("clock-fill").style.width = (100 * (1 - D.t / DAY_LEN)) + "%";
+    }
+    let statusTimer = 0;
+    function setStatus(msg) { $("status").textContent = msg; }
+
+    function floatAt(el, text, cls) {
+      const r = el.getBoundingClientRect();
+      const f = document.createElement("div");
+      f.className = "float " + (cls || "");
+      f.textContent = text;
+      f.style.left = (r.left + r.width / 2) + "px";
+      f.style.top = (r.top + 6) + "px";
+      document.body.appendChild(f);
+      setTimeout(() => f.remove(), 1300);
+    }
+    let toastT = null;
+    function toast(msg) {
+      const t = $("toast"); t.textContent = msg; t.classList.remove("hidden");
+      clearTimeout(toastT); toastT = setTimeout(() => t.classList.add("hidden"), 2200);
+    }
+
+    // ================= INPUT: drag or tap guests =================
+    let drag = null;
+    $("queue").addEventListener("pointerdown", e => {
+      const card = e.target.closest(".guest");
+      if (!card || !D || !D.running || D.paused || card.classList.contains("curl")) return;
+      e.preventDefault();
+      ac(); // unlock audio on first touch
+      drag = { id: +card.dataset.id, x0: e.clientX, y0: e.clientY, moved: false, ghost: null, hover: null };
+    });
+    window.addEventListener("pointermove", e => {
+      if (!drag) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 8) {
+        drag.moved = true;
+        const card = document.querySelector('.guest[data-id="' + drag.id + '"]');
+        if (!card) { drag = null; return; }
+        drag.ghost = card.cloneNode(true);
+        drag.ghost.classList.add("drag-ghost"); drag.ghost.classList.remove("sel");
+        document.body.appendChild(drag.ghost);
+        sel = drag.id; renderRooms(); renderLobby();
+      }
+      if (drag.moved) {
+        drag.ghost.style.left = e.clientX + "px"; drag.ghost.style.top = e.clientY + "px";
+        const t = document.elementFromPoint(e.clientX, e.clientY);
+        const room = t && t.closest(".room");
+        if (drag.hover && drag.hover !== room) drag.hover.classList.remove("hover");
+        if (room) room.classList.add("hover");
+        drag.hover = room;
+      }
+    });
+    function endDrag(e, cancel) {
+      if (!drag) return;
+      const d = drag; drag = null;
+      if (d.ghost) d.ghost.remove();
+      if (d.hover) d.hover.classList.remove("hover");
+      if (!D || !D.running) return;
+      if (d.moved) {
+        const t = cancel ? null : document.elementFromPoint(e.clientX, e.clientY);
+        const room = t && t.closest(".room");
+        if (!(room && tryPlace(d.id, +room.dataset.i))) sel = null;
+      } else {
+        sel = sel === d.id ? null : d.id;
+        if (sel != null) { SFX.pop(); setStatus("Now tap a room for that guest. Green = perfect!"); }
+      }
+      renderRooms(); renderLobby(); updateBars();
+    }
+    window.addEventListener("pointerup", e => endDrag(e, false));
+    window.addEventListener("pointercancel", e => endDrag(e, true));
+
+    $("floors").addEventListener("click", e => {
+      const room = e.target.closest(".room");
+      if (!room || !D || !D.running || D.paused) return;
+      const i = +room.dataset.i;
+      if (sel != null) { tryPlace(sel, i); renderRooms(); renderLobby(); updateBars(); return; }
+      const g = D.rooms[i];
+      if (g && g.req) openTray(i);
+      else if (g) {
+        const m = g.misses;
+        toast(g.name + " " + moodFace(g) + (m.length ? " — not quite right: " + m.map(missIcon).join(" ") : " — very happy here!"));
+      } else toast(TYPES[S.layout[i].type].n + ", " + TEMPS[S.layout[i].temp].n.toLowerCase() + ". Empty — drag a guest here!");
+    });
+
+    // ================= SERVICE TRAY =================
+    function openTray(i) {
+      trayRoom = i;
+      const g = D.rooms[i];
+      $("tray-title").innerHTML = "🛎️ <b>" + esc(g.name) + "</b> rang! What do they need?";
+      $("tray-items").innerHTML = TRAY_ORDER.map(id =>
+        '<button data-item="' + id + '">' + ITEMS[id].e + '<small>' + ITEMS[id].n + '</small></button>').join("");
+      $("tray").classList.remove("hidden");
+      SFX.pop();
+    }
+    function closeTray() { trayRoom = -1; $("tray").classList.add("hidden"); }
+    $("tray-items").addEventListener("click", e => {
+      const b = e.target.closest("button[data-item]");
+      if (b) deliver(b.dataset.item);
+    });
+    $("tray-close").addEventListener("click", closeTray);
+
+    // ================= REVIEWS =================
+    function review(r) {
+      const g = r.g, q = r.stars + (r.stars === 1 ? " quill." : " quills.");
+      if (r.left) return pick([
+        "I waited and waited. So I curled into a ball and went home. ",
+        "Nobody helped me at the desk! Hmph! ",
+        "I stood there so long my quills got tired. ",
+      ]) + q;
+      const L = S.layout[g.room] || { type: g.want.type, temp: "cozy" };
+      const m = g.misses;
+      if (m.includes("type")) return "I asked for a " + TYPES[g.want.type].r + " and got a " + TYPES[L.type].r + "?! " + q;
+      if (m.includes("quiet")) return "Too noisy next door! My quills are still standing up. " + q;
+      if (m.includes("ground")) return "I had to climb the stairs. With my little legs! " + q;
+      if (m.includes("temp")) return (g.want.temp === "cozy" ? "Brrr! I wanted it cozy and warm. " : "Way too hot! I asked for a cool room. ") + q;
+      if (g.svcMiss) return "I rang and rang for room service. Nobody came. " + q;
+      if (g.svcBad) return "Room service brought me the wrong thing. Silly! " + q;
+      if (r.stars >= 5) return pick([
+        "The " + TYPES[L.type].r + " was PERFECT. ",
+        "Best sleep of my whole life! ",
+        g.svcGood ? "Room service brought " + ITEMS[g.snack].n.toLowerCase() + " super fast! " : "Snuggly, quiet and just right. ",
+        "I will tell ALL my hedgehog friends! ",
+      ]) + q;
+      if (g.waitFrac > 0.4) return "Lovely room, but I waited a long time at the desk. " + q;
+      return "Very nice! Almost perfect. " + q;
+    }
+
+    // ================= END OF DAY =================
+    function endDay() {
+      D.running = false;
+      closeTray();
+      D.lobby = [];
+      D.rooms.forEach(g => { if (g) checkout(g, true); });
+      const res = D.results;
+      const avg = res.length ? res.reduce((a, r) => a + r.stars, 0) / res.length : 0;
+      const happy = res.filter(r => !r.left).length, angry = res.length - happy;
+      S.coins += D.coins; S.total += D.stars;
+      S.history.push({ day: S.day, stars: D.stars, coins: D.coins, avg: Math.round(avg * 10) / 10 });
+      const finished = S.day >= SEASON_DAYS;
+      const dayNum = S.day;
+      S.day++;
+      save();
+      SFX.fanfare();
+      renderRooms(); renderLobby(); renderHUD();
+      const shown = res.slice().sort(() => Math.random() - 0.5).slice(0, 5);
+      showSheet(
+        '<h2>🌙 Day ' + dayNum + ' is over!</h2>' +
+        '<div class="big-stars">' + (res.length ? starStr(avg) : "☆☆☆☆☆") + '</div>' +
+        '<div class="subtitle">Hotel rating today: <b>' + (res.length ? avg.toFixed(1) : "0") + ' / 5</b></div>' +
+        '<div class="sumrow">' +
+          box("Guests", happy) + box("Left angry", angry) + box("Coins", "+" + D.coins) + box("Stars", "+" + D.stars) +
+        '</div>' +
+        (shown.length ? '<h3 style="text-align:left;font-size:1rem;margin-top:8px">📝 Guest reviews</h3><div class="reviews">' +
+          shown.map(r => '<div class="review"><b>' + esc(r.name) + '</b> ' + starStr(r.stars) + '<br>“' + esc(review(r)) + '”</div>').join("") +
+          '</div>' : '<p class="subtitle">No guests today!</p>') +
+        '<div class="start-buttons">' + (finished
+          ? '<button class="btn" id="to-final">🏆 See season results</button>'
+          : '<button class="btn" id="to-shop">🛍️ Go to the shop</button>') + '</div>'
+      );
+      if (finished) $("to-final").onclick = seasonEnd; else $("to-shop").onclick = () => openShop(true);
+    }
+    function box(label, v) { return '<div class="score-box"><span class="label">' + label + '</span><span class="value">' + v + '</span></div>'; }
+
+    function seasonEnd() {
+      const score = S.total;
+      const entry = { score, mode: SEASON_DAYS + " days", date: Date.now(), id: Math.random() };
+      pushTop(entry);
+      const best = getTop();
+      const rank = best.findIndex(e => e.id === entry.id);
+      showSheet(
+        '<h2>🏆 Season complete!</h2>' +
+        '<p class="subtitle">Your hedgehog hotel earned</p>' +
+        '<div class="big-stars">' + score + ' ⭐</div>' +
+        '<div class="reviews">' + S.history.map(h =>
+          '<div class="review"><b>Day ' + h.day + '</b> — ' + h.stars + ' ⭐, ' + h.coins + ' 🪙, rating ' + h.avg + '/5</div>').join("") + '</div>' +
+        '<p class="subtitle">' + (rank >= 0 ? "You made the Top 10 at #" + (rank + 1) + "! 🎉" : "Not in the Top 10 this time. Try again!") + '</p>' +
+        '<div class="start-buttons"><button class="btn" id="new-season">Start a new hotel</button></div>'
+      );
+      $("new-season").onclick = () => { S = freshSave(); save(); hideSheet(); showStart(entry.id); };
+    }
+
+    // ================= SHOP =================
+    function openShop(fromDay) {
+      const items = SHOP.map(it => {
+        const owned = it.owned(), can = it.can(), cost = can ? it.cost() : 0;
+        return '<div class="shop-item' + (owned ? " owned" : "") + '"><span class="e">' + it.e + '</span>' +
+          '<div class="info"><b>' + it.n + '</b><small>' + it.d + '</small></div>' +
+          (owned ? '<button class="btn alt" disabled>Owned ✔</button>'
+            : '<button class="btn" data-buy="' + it.id + '"' + (S.coins < cost ? " disabled" : "") + '>' + cost + ' 🪙</button>') +
+          '</div>';
+      }).join("");
+      let ed = "";
+      for (let f = S.floors - 1; f >= 0; f--) {
+        ed += '<div class="row"><div class="fl">' + (f === 0 ? "G" : f) + '</div>';
+        for (let c = 0; c < COLS; c++) {
+          const i = f * COLS + c, L = S.layout[i];
+          ed += '<div class="ed-room ' + L.temp + '"><button data-ty="' + i + '"><span class="x">' + TYPES[L.type].e + '</span>' + TYPES[L.type].n + '</button>' +
+            '<button data-tm="' + i + '">' + TEMPS[L.temp].e + ' ' + TEMPS[L.temp].n + '</button></div>';
+        }
+        ed += '</div>';
+      }
+      showSheet(
+        '<h2>🛍️ Hotel shop</h2>' +
+        '<p class="subtitle">You have <b style="color:#ffd86b">' + S.coins + ' 🪙</b> · Total stars: <b>' + S.total + ' ⭐</b></p>' +
+        '<div class="shop-list">' + items + '</div>' +
+        '<h3 style="font-size:1rem;margin-top:12px">🛠️ Decorate your rooms (free!)</h3>' +
+        '<p class="tip">Tap a bed to change its type. Tap 🔥/❄️ to make it cozy or cool.</p>' +
+        '<div class="layout-ed" id="layout-ed">' + ed + '</div>' +
+        '<div class="start-buttons" style="margin-top:14px">' +
+          (S.day <= SEASON_DAYS ? '<button class="btn" id="open-day">🔔 Open for Day ' + S.day + '</button>' : "") +
+          '<button class="btn alt" id="shop-menu">🏨 Hotel menu</button></div>'
+      );
+      const sheet = $("sheet");
+      sheet.querySelectorAll("[data-buy]").forEach(b => b.onclick = () => {
+        const it = SHOP.find(x => x.id === b.dataset.buy);
+        const cost = it.cost();
+        if (!it.can() || S.coins < cost) return;
+        S.coins -= cost; it.buy(); save(); SFX.buy(); openShop(fromDay);
+      });
+      sheet.querySelectorAll("[data-ty]").forEach(b => b.onclick = () => {
+        const L = S.layout[+b.dataset.ty];
+        const k = S.types.indexOf(L.type);
+        L.type = S.types[(k + 1) % S.types.length]; save(); SFX.pop(); openShop(fromDay);
+      });
+      sheet.querySelectorAll("[data-tm]").forEach(b => b.onclick = () => {
+        const L = S.layout[+b.dataset.tm];
+        L.temp = L.temp === "cozy" ? "cool" : "cozy"; save(); SFX.pop(); openShop(fromDay);
+      });
+      const od = $("open-day"); if (od) od.onclick = () => { hideSheet(); startDay(); };
+      $("shop-menu").onclick = () => { hideSheet(); showStart(); };
+    }
+    function showSheet(html) { $("sheet").innerHTML = html; $("overlay").classList.remove("hidden"); $("overlay").scrollTop = 0; }
+    function hideSheet() { $("overlay").classList.add("hidden"); }
+
+    // ================= SCREENS =================
+    function startDay() {
+      if (S.day > SEASON_DAYS) { seasonEnd(); return; }
+      ac();
+      newDay();
+      $("start").classList.add("hidden");
+      $("game").classList.remove("hidden");
+      $("pause-btn").classList.remove("hidden"); $("menu-btn").classList.remove("hidden");
+      $("pause-btn").textContent = "⏸️";
+      setStatus("Day " + S.day + " — the doors are open! 🔔");
+      renderRooms(); renderLobby(); renderHUD();
+      window.scrollTo(0, 0);
+    }
+    function showStart(highlightId) {
+      if (D) D.running = false;
+      closeTray();
+      $("game").classList.add("hidden");
+      $("start").classList.remove("hidden");
+      $("pause-btn").classList.add("hidden"); $("menu-btn").classList.add("hidden");
+      const fresh = S.day === 1 && S.total === 0;
+      $("play-btn").textContent = fresh ? "🔔 Open the hotel" : S.day > SEASON_DAYS ? "🏆 Season results" : "▶ Continue — Day " + S.day;
+      $("save-info").textContent = fresh ? "" : "Day " + Math.min(S.day, SEASON_DAYS) + " of " + SEASON_DAYS + " · " + S.coins + " 🪙 · " + S.total + " ⭐ so far";
+      renderScores(highlightId);
+    }
+    $("play-btn").onclick = startDay;
+    $("shop-open-btn").onclick = () => openShop(false);
+    $("reset-hotel-btn").onclick = () => {
+      if (!confirm("Reset the hotel? Your day, coins and upgrades go back to the start.")) return;
+      lsDel(SAVE_KEY); S = freshSave(); SFX.pop(); showStart();
+    };
+    $("menu-btn").onclick = () => {
+      if (D && D.running) {
+        D.paused = true;
+        if (!confirm("Leave the hotel? Today's guests and coins will be lost (upgrades are saved).")) { D.paused = false; return; }
+      }
+      S = loadSave(); showStart();
+    };
+    $("pause-btn").onclick = () => {
+      if (!D || !D.running) return;
+      D.paused = !D.paused;
+      $("pause-btn").textContent = D.paused ? "▶️" : "⏸️";
+      setStatus(D.paused ? "Paused. Tap ▶️ to keep going." : "Back to work!");
+    };
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && D && D.running && !D.paused) {
+        D.paused = true; $("pause-btn").textContent = "▶️"; setStatus("Paused. Tap ▶️ to keep going.");
+      }
+    });
+
+    // ================= TOP TEN =================
+    function getTop() {
+      let a; try { a = JSON.parse(lsGet(TOP_KEY)) || []; } catch (e) { a = []; }
+      return a.filter(r => r && r.score > 0).sort((x, y) => y.score - x.score).slice(0, 10);
+    }
+    function pushTop(entry) {
+      if (!(entry.score > 0)) return;
+      const a = getTop(); a.push(entry);
+      a.sort((x, y) => y.score - x.score);
+      lsSet(TOP_KEY, JSON.stringify(a.slice(0, 10)));
+    }
+    function renderScores(highlightId) {
+      const list = $("score-list");
+      const a = getTop();
+      if (!a.length) { list.innerHTML = '<li class="empty">No seasons yet — finish 7 days!</li>'; return; }
+      list.innerHTML = a.map(e =>
+        '<li' + (e.id === highlightId ? ' class="me"' : "") + '><span class="s">' + e.score + ' ⭐</span>' +
+        '<span class="m">' + esc(e.mode || "") + '</span>' +
+        '<span class="d">' + new Date(e.date).toLocaleDateString() + '</span></li>'
+      ).join("");
+    }
+    $("reset-scores").onclick = () => {
+      if (!confirm("Erase all high scores? This can't be undone.")) return;
+      lsDel(TOP_KEY); renderScores();
+    };
+
+    showStart();
+  })();
+  </script>
+</body>
+</html>

@@ -21,6 +21,9 @@ Tap **Play** to run it. Tap **Code** to read how it works.
 | ♟️ Chess | [▶️ Play](https://cmadisons.github.io/minigames/chess.html) | [📄 Code](chess.html) |
 | 🏝️ Sky Blocks | [▶️ Play](https://cmadisons.github.io/minigames/skyblocks.html) | [📄 Code](skyblocks.html) |
 | 🦔 Whack-a-Hedgehog | [▶️ Play](https://cmadisons.github.io/minigames/hedgehog.html) | [📄 Code](hedgehog.html) |
+| 🏨 Hedgehog Hotel | [▶️ Play](https://cmadisons.github.io/minigames/hedgehog-hotel.html) | [📄 Code](hedgehog-hotel.html) |
+| 🧑‍⚖️ Umpire Simulator | [▶️ Play](https://cmadisons.github.io/minigames/umpire.html) | [📄 Code](umpire.html) |
+| ⚾ Baseball's POV | [▶️ Play](https://cmadisons.github.io/minigames/baseball-pov.html) | [📄 Code](baseball-pov.html) |
 | 🧠 Memory | [▶️ Play](https://cmadisons.github.io/minigames/memory.html) | [📄 Code](memory.html) |
 | ✊ Rock Paper Scissors | [▶️ Play](https://cmadisons.github.io/minigames/rock-paper-scissors.html) | [📄 Code](rock-paper-scissors.html) |
 | 🔢 Guess 1–100 | [▶️ Play](https://cmadisons.github.io/minigames/1-100.html) | [📄 Code](1-100.html) |
